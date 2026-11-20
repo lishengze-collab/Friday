@@ -166,10 +166,10 @@
     const asksForFreshInfo =
       /(最新|最近|目前|现在|当前|今天|今日|本周|本月|今年|实时|刚刚|刚发布|更新了吗|最新版本|价格|报价|汇率|股价|新闻|政策|法规|天气|营业时间|库存|可订|订票|预订|路线|开放时间)/i.test(text);
     const explicitSearch =
-      /(联网搜索|上网查|帮我查|查一下|搜索一下|找资料|核实|验证来源|引用来源|官网资料|官方文档|来源链接)/i.test(text);
+      /(联网搜索|上网查|帮我查|查一下|搜索一下|找资料|研究一下|调查|核实|验证来源|引用来源|官网资料|官方文档|来源链接)/i.test(text);
 
     const asksForComplexWork =
-      /(深入分析|详细分析|综合分析|推理|论证|比较.*(优缺点|区别|方案|性能|成本)|制定.*(计划|方案|策略)|规划|架构设计|系统设计|重构|调试|排查|修复.*(代码|程序|bug|错误)|代码审查|数学证明|逐步计算|多步骤|决策分析|风险分析|财务规划|投资分析)/i.test(text) ||
+      /(深入分析|详细分析|综合分析|推理|论证|比较.*(优缺点|区别|方案|性能|成本)|制定.*(计划|方案|策略)|规划|架构设计|系统设计|重构|调试|排查|修复.*(代码|程序|bug|错误)|代码审查|数学证明|逐步计算|多步骤|决策分析|风险分析|财务规划|投资分析|debug|traceback|crash|stack trace|审计|优化架构)/i.test(text) ||
       text.length > 900 ||
       ((text.match(/\n/g) || []).length >= 12 && text.length > 500);
 
@@ -177,10 +177,13 @@
       /(api|sdk|框架|库|依赖|浏览器兼容|ios|ios\s*\d+|版本|报错|错误码|官方文档|release notes|changelog)/i.test(normalized) &&
       /(最新|当前|现在|如何配置|为什么|不兼容|失效|变更|升级|报错|错误)/i.test(normalized);
 
-    const search = !explicitNoSearch && (urlProvided || asksForFreshInfo || explicitSearch || asksForTechnicalFreshness);
-    const deepThinking = asksForComplexWork || (search && /(比较|评估|原因|为什么|方案|影响|利弊|风险|诊断|修复)/i.test(text));
+    const search = !explicitNoSearch && (asksForFreshInfo || explicitSearch || asksForTechnicalFreshness);
+    const readUrl = !explicitNoSearch && urlProvided;
+    const deepThinking =
+      asksForComplexWork ||
+      (search && /(比较|评估|原因|为什么|方案|影响|利弊|风险|诊断|修复)/i.test(text));
 
-    return { search, deepThinking, urlProvided, text };
+    return { search, deepThinking, urlProvided: readUrl, text };
   }
 
   // Install before app.js starts making API calls. This keeps the original chat UI and
