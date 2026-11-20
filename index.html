@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120m');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120n');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -451,34 +451,29 @@
       function appendQuoteToComposer(row) {
         const input = byId('message-input');
         if (!input) return;
-        const bubble = row.querySelector('.bubble');
-        if (!bubble) return;
 
-        const text = plainMessageText(row);
+        const text = plainMessageText(row).replace(/\s+/g, ' ').trim();
         if (!text) return;
 
-        const role = row.classList.contains('assistant') ? 'Friday 的回复' : '我之前发送的消息';
-        const chatTitle = String(byId('active-chat-title')?.textContent || '当前对话').trim();
-        const maxChars = 2800;
-        const quote = text.length > maxChars
-          ? text.slice(0, 1850) + '\n…（中间内容已省略）…\n' + text.slice(-850)
+        const role = row.classList.contains('assistant') ? 'Friday' : '我';
+        // Keep only a compact excerpt; the surrounding chat history already
+        // supplies the full conversational context when this follow-up is sent.
+        const excerpt = text.length > 120
+          ? text.slice(0, 120).trimEnd() + '…'
           : text;
-        const quoted = quote.split(/\r?\n/).map(line => '> ' + line).join('\n');
-        const block = '\n\n【引用追问｜' + chatTitle + '｜' + role + '】\n' +
-          quoted +
-          '\n\n请围绕这条消息继续回答：';
+        const block = (input.value.trim() ? '\n\n' : '') +
+          '【追问引用 · ' + role + '】\n' +
+          '> ' + excerpt +
+          '\n\n请继续说明：';
 
-        const inputIsFocused = document.activeElement === input;
-        const start = inputIsFocused ? input.selectionStart : input.value.length;
-        const end = inputIsFocused ? input.selectionEnd : input.value.length;
-        const prefix = start > 0 && !/\n\s*$/.test(input.value.slice(0, start)) ? '\n\n' : '';
-        input.setRangeText(prefix + block, start, end, 'end');
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        input.setRangeText(block, start, end, 'end');
         input.dispatchEvent(new Event('input', { bubbles: true }));
         try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
         const caret = input.value.length;
         input.setSelectionRange(caret, caret);
       }
-
       function addButtons() {
         root.querySelectorAll('.message-row').forEach(row => {
           const meta = row.querySelector('.message-meta');
