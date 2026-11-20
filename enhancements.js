@@ -3,14 +3,20 @@
   'use strict';
   const PREF_KEY = 'sidechat-ai-options-v1';
   const META_KEY = 'sidechat-server-tools-v1';
-  const MAX_OUTPUT_TOKENS = 393216; // DeepSeek Chat Completions documented ceiling (384K).
+  const AUTO_MODE_DEFAULT = true;
   const nativeFetch = window.fetch.bind(window);
 
   function readPrefs() {
     try {
       const raw = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
-      return { webSearch: raw.webSearch === true, deepThinking: raw.deepThinking === true };
-    } catch { return { webSearch: false, deepThinking: false }; }
+      return {
+        autoMode: raw.autoMode !== false,
+        webSearch: raw.webSearch === true,
+        deepThinking: raw.deepThinking === true
+      };
+    } catch {
+      return { autoMode: AUTO_MODE_DEFAULT, webSearch: false, deepThinking: false };
+    }
   }
   function savePrefs(prefs) {
     try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch { /* browser storage may be disabled */ }
@@ -82,27 +88,99 @@
     const wrap = document.createElement('div');
     wrap.id = 'sidechat-ai-options';
     wrap.innerHTML = `
-      <div class="setting-row" style="border-top:1px solid #e9eee8;padding-top:14px;margin-top:16px">
-        <div><b>联网搜索</b></div>
+      <div class="setting-row" style="border-top:1px solid #e9eeee;padding-top:14px;margin-top:16px">
+        <div>
+          <b>自动判断思考与联网</b>
+          <small id="sidechat-auto-hint">根据问题复杂度和时效性自动选择</small>
+        </div>
+        <label class="switch"><input id="sidechat-auto-mode" type="checkbox"><span></span></label>
+      </div>
+      <div class="setting-row" style="margin-top:12px">
+        <div><b>联网搜索（手动）</b><small>关闭自动判断后生效</small></div>
         <label class="switch"><input id="sidechat-web-search" type="checkbox"><span></span></label>
       </div>
       <div class="setting-row" style="margin-top:12px">
-        <div><b>深度思考</b></div>
+        <div><b>深度思考（手动）</b><small>复杂分析、规划和代码问题</small></div>
         <label class="switch"><input id="sidechat-deep-thinking" type="checkbox"><span></span></label>
       </div>
       `;
     modelSelect.insertAdjacentElement('afterend', wrap);
+    const automatic = document.getElementById('sidechat-auto-mode');
     const web = document.getElementById('sidechat-web-search');
     const deep = document.getElementById('sidechat-deep-thinking');
+    const hint = document.getElementById('sidechat-auto-hint');
+
+    automatic.checked = prefs.autoMode;
     web.checked = prefs.webSearch;
     deep.checked = prefs.deepThinking;
+
     const sync = () => {
-      const next = { webSearch: web.checked, deepThinking: deep.checked };
-      savePrefs(next);
+      const autoMode = automatic.checked;
+      web.disabled = autoMode;
+      deep.disabled = autoMode;
+      hint.textContent = autoMode
+        ? '已启用：AI 自动判断是否需要联网或深度思考'
+        : '手动模式：以下两个开关将直接控制请求';
+      web.closest('.setting-row').style.opacity = autoMode ? '.48' : '1';
+      deep.closest('.setting-row').style.opacity = autoMode ? '.48' : '1';
+      savePrefs({
+        autoMode,
+        webSearch: web.checked,
+        deepThinking: deep.checked
+      });
     };
+
+    automatic.addEventListener('change', sync);
     web.addEventListener('change', sync);
     deep.addEventListener('change', sync);
     sync();
+  }
+
+  function extractLatestUserText(messages) {
+    if (!Array.isArray(messages)) return '';
+    const last = [...messages].reverse().find(message => message?.role === 'user');
+    if (!last) return '';
+    const content = last.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content.map(part => {
+        if (typeof part === 'string') return part;
+        if (typeof part?.text === 'string') return part.text;
+        if (typeof part?.content === 'string') return part.content;
+        return '';
+      }).filter(Boolean).join('\n');
+    }
+    return '';
+  }
+
+  function containsUrl(text) {
+    return /https?:\/\/[^\s)\]}>]+/i.test(text);
+  }
+
+  function decideRequestMode(messages) {
+    const text = extractLatestUserText(messages);
+    const normalized = text.toLowerCase();
+    const explicitNoSearch = /(不要|无需|不用|不需要|别)\s*(联网|搜索|查网页|上网)/i.test(text);
+
+    const urlProvided = containsUrl(text);
+    const asksForFreshInfo =
+      /(最新|最近|目前|现在|当前|今天|今日|本周|本月|今年|实时|刚刚|刚发布|更新了吗|最新版本|价格|报价|汇率|股价|新闻|政策|法规|天气|营业时间|库存|可订|订票|预订|路线|开放时间)/i.test(text);
+    const explicitSearch =
+      /(联网搜索|上网查|帮我查|查一下|搜索一下|找资料|核实|验证来源|引用来源|官网资料|官方文档|来源链接)/i.test(text);
+
+    const asksForComplexWork =
+      /(深入分析|详细分析|综合分析|推理|论证|比较.*(优缺点|区别|方案|性能|成本)|制定.*(计划|方案|策略)|规划|架构设计|系统设计|重构|调试|排查|修复.*(代码|程序|bug|错误)|代码审查|数学证明|逐步计算|多步骤|决策分析|风险分析|财务规划|投资分析)/i.test(text) ||
+      text.length > 900 ||
+      ((text.match(/\n/g) || []).length >= 12 && text.length > 500);
+
+    const asksForTechnicalFreshness =
+      /(api|sdk|框架|库|依赖|浏览器兼容|ios|ios\s*\d+|版本|报错|错误码|官方文档|release notes|changelog)/i.test(normalized) &&
+      /(最新|当前|现在|如何配置|为什么|不兼容|失效|变更|升级|报错|错误)/i.test(normalized);
+
+    const search = !explicitNoSearch && (urlProvided || asksForFreshInfo || explicitSearch || asksForTechnicalFreshness);
+    const deepThinking = asksForComplexWork || (search && /(比较|评估|原因|为什么|方案|影响|利弊|风险|诊断|修复)/i.test(text));
+
+    return { search, deepThinking, urlProvided, text };
   }
 
   // Install before app.js starts making API calls. This keeps the original chat UI and
@@ -116,16 +194,37 @@
         const isMemoryUpdate = body.messages?.some(m => m.role === 'system' && String(m.content || '').includes('维护一个 Sidechat 的长期用户偏好摘要'));
         if (isMemoryUpdate) return nativeFetch(input, init);
         const prefs = readPrefs();
-        if (prefs.webSearch) addPreviousToolContext(body);
-        if (prefs.deepThinking) body.max_tokens = MAX_OUTPUT_TOKENS;
-        body.thinking = { type: prefs.deepThinking ? 'enabled' : 'disabled' };
-        body.reasoning_effort = prefs.deepThinking ? 'max' : 'none';
-        if (prefs.webSearch) {
-          body.model = 'deepseek-flash'; // DeepSeek web tools are currently supported on Flash.
-          body.tools = [{ type: 'deepseek_web_search' }, { type: 'deepseek_read_url' }];
+        const automatic = prefs.autoMode !== false;
+        const decision = automatic
+          ? decideRequestMode(body.messages)
+          : { search: prefs.webSearch, deepThinking: prefs.deepThinking, urlProvided: containsUrl(extractLatestUserText(body.messages)) };
+
+        if (decision.search) addPreviousToolContext(body);
+
+        // DeepSeek's server-side web tools are model-selected once made available.
+        // Thinking + web_search enables multi-step deep-thinking search.
+        body.thinking = { type: decision.deepThinking ? 'enabled' : 'disabled' };
+        body.reasoning_effort = decision.deepThinking ? 'high' : 'none';
+
+        if (decision.search) {
+          body.model = 'deepseek-flash';
+          body.tools = [
+            { type: 'deepseek_web_search' },
+            { type: 'deepseek_read_url' }
+          ];
+        } else if (decision.urlProvided) {
+          body.tools = [{ type: 'deepseek_read_url' }];
         } else {
           delete body.tools;
         }
+
+        // Keep a lightweight mode label for diagnostics without exposing private content.
+        console.info(
+          '[Friday AI mode]',
+          automatic ? 'auto' : 'manual',
+          decision.deepThinking ? 'deep-thinking' : 'standard',
+          decision.search ? 'web-enabled' : (decision.urlProvided ? 'read-url' : 'offline')
+        );
         nextInit = { ...init, body: JSON.stringify(body) };
       } catch (error) { console.warn('Sidechat request options could not be applied:', error); }
     }
