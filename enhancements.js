@@ -33,7 +33,7 @@
       const saved = cache[hashText(item.content)];
       if (!saved) continue;
       if (saved.server_tool_calls?.length) item.server_tool_calls = saved.server_tool_calls;
-      if (saved.reasoning_content) item.reasoning_content = saved.reasoning_content;
+      if (typeof saved.reasoning_content === 'string') item.reasoning_content = saved.reasoning_content;
     }
   }
   function getSources(message) {
@@ -123,7 +123,10 @@
       const content = normalizeMessageContent(message);
       if ((message.server_tool_calls?.length || typeof message.reasoning_content === 'string') && content) {
         const cache = readMeta();
-        cache[hashText(content)] = { server_tool_calls: message.server_tool_calls, reasoning_content: message.reasoning_content || '' };
+        const saved = {};
+        if (message.server_tool_calls?.length) saved.server_tool_calls = message.server_tool_calls;
+        if (typeof message.reasoning_content === 'string') saved.reasoning_content = message.reasoning_content;
+        cache[hashText(content)] = saved;
         writeMeta(cache);
       }
       const headers = new Headers(response.headers);
