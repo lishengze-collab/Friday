@@ -171,21 +171,23 @@
   </style>
 
   <style id="friday-native-keyboard-fix">
-    html, body {
-      width: 100% !important;
-      height: 100% !important;
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
       overflow: hidden !important;
-      overscroll-behavior: none !important;
+      overscroll-behavior: none;
     }
 
     body {
-      position: fixed !important;
-      inset: 0 !important;
+      min-height: 0;
     }
 
     #app {
-      top: 0 !important;
       height: var(--friday-viewport-height, 100dvh) !important;
+      min-height: 0 !important;
+      overflow: hidden;
     }
   </style>
 </head>
@@ -724,149 +726,79 @@
   (() => {
     'use strict';
 
-    if (window.__fridayNativeKeyboardFix) return;
-    window.__fridayNativeKeyboardFix = true;
+    if (window.__fridayNativeKeyboardFixV2) return;
+    window.__fridayNativeKeyboardFixV2 = true;
 
     const root = document.documentElement;
-    const vv = window.visualViewport;
-
-    let fullHeight = Math.max(
-      window.innerHeight || 0,
-      vv?.height || 0
-    );
+    const viewport = window.visualViewport;
 
     let rafId = 0;
-    let settleTimers = [];
 
-    const viewportHeight = () =>
-      Math.round(vv?.height || window.innerHeight || fullHeight);
+    // 同步当前可视区域高度
+    function updateViewport() {
+      if (rafId) return;
 
-    const keyboardThreshold = () =>
-      Math.max(120, fullHeight * 0.16);
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
 
-    function resetDocumentScroll() {
-      if (window.scrollX || window.scrollY) {
-        window.scrollTo(0, 0);
-      }
+        const height =
+          viewport && viewport.scale <= 1.01
+            ? viewport.height
+            : window.innerHeight;
 
-      if (root.scrollTop) root.scrollTop = 0;
-      if (document.body?.scrollTop) {
-        document.body.scrollTop = 0;
-      }
+        if (height > 0) {
+          root.style.setProperty(
+            '--friday-viewport-height',
+            Math.round(height) + 'px'
+          );
+        }
+      });
     }
 
-    function syncAppViewport() {
-      rafId = 0;
-
-      const height = viewportHeight();
-      const keyboardVisible =
-        height < fullHeight - keyboardThreshold();
-
-      if (keyboardVisible) {
-        // 键盘打开：只缩小应用内部可视高度
-        root.style.setProperty(
-          '--friday-viewport-height',
-          height + 'px'
-        );
-      } else {
-        // 键盘关闭：恢复完整页面高度
-        root.style.setProperty(
-          '--friday-viewport-height',
-          '100dvh'
-        );
-
-        fullHeight = Math.max(
-          fullHeight,
-          height,
-          window.innerHeight || 0
-        );
-
-        resetDocumentScroll();
-      }
-    }
-
-    function scheduleSync() {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(syncAppViewport);
-    }
-
-    function settleAfterFocusChange() {
-      scheduleSync();
-
-      // 兼容 iOS 键盘收起动画
-      settleTimers.forEach(clearTimeout);
-
-      settleTimers = [80, 180, 320, 520, 760, 1050].map(
-        delay => setTimeout(scheduleSync, delay)
+    // 键盘弹出或收起时，浏览器可视区域发生变化
+    if (viewport) {
+      viewport.addEventListener(
+        'resize',
+        updateViewport,
+        { passive: true }
       );
     }
 
-    document.addEventListener('focusin', scheduleSync, true);
+    // 浏览器窗口尺寸变化
+    window.addEventListener(
+      'resize',
+      updateViewport,
+      { passive: true }
+    );
 
+    // 输入框获得或失去焦点
     document.addEventListener(
-      'focusout',
-      settleAfterFocusChange,
+      'focusin',
+      updateViewport,
       true
     );
 
+    document.addEventListener(
+      'focusout',
+      updateViewport,
+      true
+    );
+
+    // 页面恢复或屏幕方向变化
     window.addEventListener(
-      'resize',
-      scheduleSync,
-      { passive: true }
+      'pageshow',
+      updateViewport
     );
 
     window.addEventListener(
       'orientationchange',
-      () => {
-        setTimeout(() => {
-          fullHeight = Math.max(
-            window.innerHeight || 0,
-            vv?.height || 0
-          );
-          scheduleSync();
-        }, 350);
-      },
+      updateViewport,
       { passive: true }
     );
 
-    if (vv) {
-      vv.addEventListener('resize', scheduleSync, {
-        passive: true
-      });
+    // 初始化
+    updateViewport();
 
-      vv.addEventListener('scroll', scheduleSync, {
-        passive: true
-      });
-    }
-
-    window.addEventListener(
-      'scroll',
-      resetDocumentScroll,
-      { passive: true }
-    );
-
-    window.addEventListener('pageshow', () => {
-      fullHeight = Math.max(
-        fullHeight,
-        window.innerHeight || 0,
-        vv?.height || 0
-      );
-
-      root.style.setProperty(
-        '--friday-viewport-height',
-        '100dvh'
-      );
-
-      resetDocumentScroll();
-      scheduleSync();
-    });
-
-    root.style.setProperty(
-      '--friday-viewport-height',
-      '100dvh'
-    );
-
-    scheduleSync();
   })();
   </script>
 </body>
