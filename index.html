@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120f');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120g');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -603,15 +603,18 @@
   (() => {
     'use strict';
 
-    if (window.__fridayViewportShellV5) return;
-    window.__fridayViewportShellV5 = true;
+    if (window.__fridayViewportShellV6) return;
+    window.__fridayViewportShellV6 = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
+    const KEYBOARD_GAP = 2;
     let frame = 0;
-    let fullHeight = window.innerHeight || root.clientHeight || 1;
-    let lastAppHeight = -1;
-    let lastKeyboardState = null;
+    let fullVisualHeight = window.innerHeight || root.clientHeight || 1;
+    let keyboardOpen = false;
+    let lastTop = -1;
+    let lastHeight = -1;
+    let lastTouchY = null;
 
     function syncViewport() {
       if (frame) return;
@@ -619,36 +622,40 @@
       frame = requestAnimationFrame(() => {
         frame = 0;
 
-        const layoutHeight = window.innerHeight || root.clientHeight || fullHeight;
-        let visibleTop = 0;
+        const layoutHeight = window.innerHeight || root.clientHeight || fullVisualHeight;
+        let top = 0;
         let visibleHeight = layoutHeight;
 
         if (viewport && viewport.scale >= 0.98 && viewport.scale <= 1.02) {
-          visibleTop = Math.max(0, viewport.offsetTop || 0);
+          top = Math.max(0, viewport.offsetTop || 0);
           visibleHeight = viewport.height || layoutHeight;
         }
 
-        // The bottom edge of the visual viewport, expressed in layout coordinates.
-        // Keep #app top at 0: Safari may pan the visual viewport, but the app shell
-        // must not become a separately moving drawer.
-        const visibleBottom = Math.max(1, visibleTop + visibleHeight);
-        const appHeight = Math.max(1, Math.min(fullHeight, visibleBottom));
-        const keyboardOpen = (fullHeight - appHeight) > Math.max(120, fullHeight * 0.14);
+        const nextKeyboardOpen =
+          (fullVisualHeight - visibleHeight) > Math.max(110, fullVisualHeight * 0.13);
 
+        // On keyboard open, subtract only the intentional 2px visual gap.
+        const appHeight = Math.max(1, visibleHeight - (nextKeyboardOpen ? KEYBOARD_GAP : 0));
+        const roundedTop = Math.round(top);
         const roundedHeight = Math.round(appHeight);
-        if (roundedHeight !== lastAppHeight) {
-          root.style.setProperty('--friday-app-height', roundedHeight + 'px');
-          lastAppHeight = roundedHeight;
+
+        if (roundedTop !== lastTop) {
+          root.style.setProperty('--friday-vv-top', roundedTop + 'px');
+          lastTop = roundedTop;
         }
 
-        if (keyboardOpen !== lastKeyboardState) {
+        if (roundedHeight !== lastHeight) {
+          root.style.setProperty('--friday-vv-height', roundedHeight + 'px');
+          lastHeight = roundedHeight;
+        }
+
+        if (nextKeyboardOpen !== keyboardOpen) {
+          keyboardOpen = nextKeyboardOpen;
           root.classList.toggle('friday-keyboard-open', keyboardOpen);
-          lastKeyboardState = keyboardOpen;
         }
 
-        // Refresh the baseline only after the viewport has returned to its full height.
         if (!keyboardOpen && layoutHeight > 0) {
-          fullHeight = layoutHeight;
+          fullVisualHeight = visibleHeight;
         }
       });
     }
@@ -661,7 +668,7 @@
     window.addEventListener('resize', syncViewport, { passive: true });
     window.addEventListener('orientationchange', () => {
       requestAnimationFrame(() => {
-        fullHeight = window.innerHeight || root.clientHeight || fullHeight;
+        fullVisualHeight = window.innerHeight || root.clientHeight || fullVisualHeight;
         syncViewport();
       });
     }, { passive: true });
@@ -669,27 +676,82 @@
     document.addEventListener('focusin', syncViewport, true);
     document.addEventListener('focusout', syncViewport, true);
 
-    // The composer frame itself is fixed; only its editable controls remain interactive.
-    const composer = document.getElementById('composer-wrap');
-    if (composer) {
-      let lockComposerSurface = false;
+    // Lock the document's touch surface. Only message/history panels may scroll.
+    // At scroll boundaries, stop touch chaining so the page itself never rubber-bands.
+    const scrollAllowlist = [
+      '#chat-scroll',
+      '.float-panel',
+      '.settings-sheet',
+      '.long-editor-sheet',
+      '.history-picker-sheet',
+      '.history-list',
+      '.token-chat-usage',
+      '#message-input',
+      '#long-editor-text',
+      '.bubble pre',
+      '.src-fold-body'
+    ].join(',');
 
-      composer.addEventListener('touchstart', event => {
-        lockComposerSurface = !event.target.closest(
-          'textarea, input, button, select, a, [contenteditable="true"]'
-        );
-      }, { passive: true });
-
-      composer.addEventListener('touchmove', event => {
-        if (lockComposerSurface) event.preventDefault();
-      }, { passive: false });
-
-      const releaseComposerSurface = () => {
-        lockComposerSurface = false;
-      };
-      composer.addEventListener('touchend', releaseComposerSurface, { passive: true });
-      composer.addEventListener('touchcancel', releaseComposerSurface, { passive: true });
+    function getScrollSurface(target) {
+      return target instanceof Element ? target.closest(scrollAllowlist) : null;
     }
+
+    document.addEventListener('touchstart', event => {
+      lastTouchY = event.touches[0]?.clientY ?? null;
+    }, { passive: true, capture: true });
+
+    document.addEventListener('touchmove', event => {
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      const currentY = touch.clientY;
+      const deltaY = lastTouchY == null ? 0 : currentY - lastTouchY;
+      lastTouchY = currentY;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const surface = target ? getScrollSurface(target) : null;
+
+      if (!surface) {
+        event.preventDefault();
+        return;
+      }
+
+      // Editable controls keep native cursor selection and text editing.
+      if (surface.matches('textarea, input, [contenteditable="true"]')) return;
+
+      const maxScroll = surface.scrollHeight - surface.clientHeight;
+      if (maxScroll <= 1) {
+        event.preventDefault();
+        return;
+      }
+
+      const atTop = surface.scrollTop <= 1;
+      const atBottom = surface.scrollTop >= maxScroll - 1;
+      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+        event.preventDefault();
+      }
+    }, { passive: false, capture: true });
+
+    const resetTouch = () => { lastTouchY = null; };
+    document.addEventListener('touchend', resetTouch, { passive: true, capture: true });
+    document.addEventListener('touchcancel', resetTouch, { passive: true, capture: true });
+
+    // Do not allow the browser's document-level wheel gesture to move the shell.
+    document.addEventListener('wheel', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const surface = target ? getScrollSurface(target) : null;
+      if (!surface) {
+        event.preventDefault();
+        return;
+      }
+      if (surface.matches('textarea, input, [contenteditable="true"]')) return;
+      const maxScroll = surface.scrollHeight - surface.clientHeight;
+      if (maxScroll <= 1 ||
+          (surface.scrollTop <= 1 && event.deltaY < 0) ||
+          (surface.scrollTop >= maxScroll - 1 && event.deltaY > 0)) {
+        event.preventDefault();
+      }
+    }, { passive: false, capture: true });
 
     syncViewport();
   })();
