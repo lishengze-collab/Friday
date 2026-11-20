@@ -178,6 +178,9 @@
       margin: 0;
       overflow: hidden !important;
       overscroll-behavior: none;
+      /* 增加以下两行，锁死整个页面防止拖动 */
+      position: fixed;
+      inset: 0;
     }
 
     body {
@@ -185,6 +188,11 @@
     }
 
     #app {
+      /* 增加以下绝对定位，确保应用跟随高度变量收缩且不产生整体滚动 */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
       height: var(--friday-viewport-height, 100dvh) !important;
       min-height: 0 !important;
       overflow: hidden;
