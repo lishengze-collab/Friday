@@ -466,8 +466,9 @@
           '> ' + excerpt +
           '\n\n请继续说明：';
 
-        const start = input.selectionStart ?? input.value.length;
-        const end = input.selectionEnd ?? input.value.length;
+        const inputIsFocused = document.activeElement === input;
+        const start = inputIsFocused ? input.selectionStart : input.value.length;
+        const end = inputIsFocused ? input.selectionEnd : input.value.length;
         input.setRangeText(block, start, end, 'end');
         input.dispatchEvent(new Event('input', { bubbles: true }));
         try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
