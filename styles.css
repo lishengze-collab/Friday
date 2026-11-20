@@ -18,7 +18,8 @@
   --bubble-font: 15px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --friday-app-height: 100dvh;
+  --friday-vv-top: 0px;
+  --friday-vv-height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   background: var(--wa-paper);
@@ -35,14 +36,15 @@ body {
   width: 100%;
   height: 100%;
   margin: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
   background: var(--wa-paper);
   color: var(--wa-ink);
 }
 
 body {
-  position: relative;
+  position: fixed;
+  inset: 0;
   min-height: 0;
 }
 
@@ -66,14 +68,14 @@ select:focus-visible {
 }
 
 #app {
-  /* One stable shell: never move the top edge when the keyboard opens. */
+  /* The entire app follows the visual viewport as one unit. */
   position: fixed;
-  top: 0;
+  top: var(--friday-vv-top, 0px);
   right: 0;
   bottom: auto;
   left: 0;
   width: 100%;
-  height: var(--friday-app-height, 100dvh);
+  height: var(--friday-vv-height, 100dvh);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -477,9 +479,9 @@ select:focus-visible {
   user-select: text;
 }
 
-/* When the software keyboard is open, keep a constant 8px keyboard-to-composer gap. */
+/* Keep the composer almost touching the keyboard in native-chat-app fashion. */
 html.friday-keyboard-open .composer-wrap {
-  padding-bottom: 8px;
+  padding-bottom: 2px;
 }
 
 .composer {
@@ -948,11 +950,11 @@ body.orbs-open #app .float-orb {
 .token-stats-backdrop {
   position: fixed;
   z-index: 20;
-  top: 0;
+  top: var(--friday-vv-top, 0px);
   right: 0;
   bottom: auto;
   left: 0;
-  height: var(--friday-app-height);
+  height: var(--friday-vv-height, 100dvh);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -969,7 +971,7 @@ body.orbs-open #app .float-orb {
 .long-editor-sheet,
 .history-picker-sheet {
   width: min(100%, 760px);
-  max-height: calc(var(--friday-app-height) - 10px);
+  max-height: calc(var(--friday-vv-height, 100dvh) - 10px);
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -983,7 +985,7 @@ body.orbs-open #app .float-orb {
 
 .settings-sheet {
   width: min(100%, 560px);
-  max-height: calc(var(--friday-app-height) - 8px);
+  max-height: calc(var(--friday-vv-height, 100dvh) - 8px);
   overflow: auto;
   padding: 9px 21px calc(18px + var(--safe-bottom));
 }
@@ -1371,7 +1373,7 @@ select:focus,
 
 /* Token stats */
 .token-stats-sheet {
-  max-height: min(calc(var(--friday-app-height) - 16px), 760px);
+  max-height: min(calc(var(--friday-vv-height, 100dvh) - 16px), 760px);
 }
 
 .token-stat-grid {
@@ -1835,14 +1837,14 @@ body.orbs-open .edge-zone::after { opacity: 0; }
 
   .settings-sheet {
     border-radius: 23px;
-    max-height: min(calc(var(--friday-app-height) - 40px), 850px);
+    max-height: min(calc(var(--friday-vv-height, 100dvh) - 40px), 850px);
     padding: 12px 28px 23px;
   }
 
   .long-editor-sheet,
   .history-picker-sheet {
     border-radius: 23px;
-    max-height: min(calc(var(--friday-app-height) - 40px), 850px);
+    max-height: min(calc(var(--friday-vv-height, 100dvh) - 40px), 850px);
     padding: 14px 22px 18px;
   }
 
@@ -1913,7 +1915,7 @@ body.orbs-open .edge-zone::after { opacity: 0; }
   .long-editor-sheet,
   .history-picker-sheet,
   .settings-sheet {
-    max-height: var(--friday-app-height);
+    max-height: var(--friday-vv-height, 100dvh);
   }
 
   #long-editor-text {
