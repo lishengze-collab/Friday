@@ -22,8 +22,10 @@ DeepSeek web tools are currently supported on `deepseek-flash`, so Sidechat auto
 
 The client uses DeepSeek's server-side `deepseek_web_search` and `deepseek_read_url` tools. The model decides when search or URL reading is necessary; citations are appended as source links.
 
+The application logic is gzip-compressed in `app.bundle.gz.b64`; `app.js` expands it at runtime with the browser's `DecompressionStream` API. The app bundle includes a ready-state fallback so it initializes even when decompression completes after DOM parsing.
+
 ## Deploy
-The repository root must contain all files: `index.html`, `styles.css`, `app.js`, `enhancements.js`, `manifest.webmanifest`, `sw.js`, `icon.svg`, `icon.png`, `icon-192.png`, `icon-512.png`, and `worker.js`. In **Settings → Pages**, choose **Deploy from a branch → main → /(root)**.
+The repository root must contain all files: `index.html`, `styles.css`, `app.js`, `app.bundle.gz.b64`, `enhancements.js`, `manifest.webmanifest`, `sw.js`, `icon.svg`, `icon.png`, `icon-192.png`, `icon-512.png`, and `worker.js`. In **Settings → Pages**, choose **Deploy from a branch → main → /(root)**.
 
 ## Configure API access
 1. Open **功能 → 设置与偏好**.
