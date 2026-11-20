@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120k');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120l');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -630,6 +630,7 @@
       '.history-list',
       '.token-chat-usage',
       '#long-editor-text',
+      '#message-input',
       '.bubble pre'
     ].join(',');
 
@@ -730,6 +731,9 @@
         event.preventDefault();
         return;
       }
+
+      // Native text selection and textarea editing stay under iOS control.
+      if (touchScroller.matches('#message-input')) return;
 
       const maxScroll = touchScroller.scrollHeight - touchScroller.clientHeight;
       if (maxScroll <= 1) {
