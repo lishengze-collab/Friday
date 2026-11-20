@@ -1068,7 +1068,7 @@ body.orbs-open #app .float-orb {
 .sheet-head p {
   margin: 5px 0 0;
   color: #89959a;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .field-label {
@@ -2102,6 +2102,24 @@ body.orbs-open .edge-zone::after { opacity: 0; }
   min-height: 112px;
   max-height: 190px;
   resize: none;
+}
+
+#settings-modal #model-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  min-height: 50px;
+  padding: 0 42px 0 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+#settings-modal #model-select option {
+  font-size: 15px;
 }
 
 @media (min-width: 700px) {
