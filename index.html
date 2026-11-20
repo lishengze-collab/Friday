@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Sidechat">
+  <meta name="description" content="一个由 DeepSeek API 驱动的开放式 AI 聊天客户端，支持图片识别、OCR、文档问答与多对话记忆。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>Sidechat</title>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="chat-heading">
+        <div class="chat-title-line"><h1 id="active-chat-title">Sidechat</h1><span id="status-dot" class="status-dot"></span></div>
+        <div class="chat-subtitle" id="chat-subtitle">私人对话 · 本地保存</div>
+      </div>
+      <button class="top-icon" id="new-chat-top" title="新建 Sidechat" aria-label="新建 Sidechat">＋</button>
+    </header>
+
+    <main id="chat-scroll" class="chat-scroll" aria-live="polite">
+      <div id="date-divider" class="date-divider"><span>今天</span></div>
+      <section id="messages" class="messages"></section>
+      <div id="typing-indicator" class="typing-indicator" hidden>
+        <div class="typing-avatar">S</div><div class="typing-bubble"><i></i><i></i><i></i><span>正在思考</span></div>
+      </div>
+      <div id="scroll-anchor"></div>
+    </main>
+
+    <div class="composer-wrap" id="composer-wrap">
+      <div id="attachment-tray" class="attachment-tray" hidden></div>
+      <div class="composer">
+        <button id="attach-button" class="composer-action" aria-label="上传图片或文档" title="上传图片或文档">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <textarea id="message-input" rows="1" placeholder="输入消息……" enterkeyhint="send" aria-label="输入消息"></textarea>
+        <button id="send-button" class="send-button" aria-label="发送消息" title="发送">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 19.5 15-7.5-15-7.5 2.1 6.2 8.2 1.3-8.2 1.3z"/></svg>
+        </button>
+      </div>
+      <div class="composer-note">Sidechat 使用 DeepSeek API · 请在设置中配置你的 API Key</div>
+    </div>
+
+    <input id="file-input" type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.csv,.json,.html,.js,.py,.epub" multiple hidden>
+    <input id="import-input" type="file" accept="application/json,.json" hidden>
+
+    <button class="float-orb chat-orb" id="chat-orb" aria-label="切换 Sidechat" title="切换 Sidechat">
+      <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-5 4v-4.8A2.4 2.4 0 0 1 4 13.5z"/><path d="M8 8h8M8 11.5h5"/></svg>
+      <span class="orb-label">对话</span>
+    </button>
+    <button class="float-orb menu-orb" id="menu-orb" aria-label="功能菜单" title="功能菜单">
+      <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+      <span class="orb-label">功能</span>
+    </button>
+
+    <div id="chat-panel" class="float-panel chat-panel" hidden>
+      <div class="panel-head"><div><strong>Sidechat</strong><small>独立对话与记忆</small></div><button class="plain-icon" data-close="chat-panel" aria-label="关闭">×</button></div>
+      <button class="panel-primary" id="new-chat-button"><span>＋</span> 新建 Sidechat</button>
+      <div id="chat-list" class="chat-list"></div>
+      <div class="panel-foot">每个 Sidechat 独立保留历史与偏好</div>
+    </div>
+
+    <div id="menu-panel" class="float-panel menu-panel" hidden>
+      <div class="panel-head"><div><strong>功能</strong><small>当前对话工具</small></div><button class="plain-icon" data-close="menu-panel" aria-label="关闭">×</button></div>
+      <button class="menu-item" id="open-settings"><span class="menu-glyph">⚙</span><span><b>设置与偏好</b><small>API Key、模型、文字大小</small></span></button>
+      <button class="menu-item" id="ocr-latest"><span class="menu-glyph">▤</span><span><b>识别附件文字（OCR）</b><small>对最近上传的图片或文档执行 OCR</small></span></button>
+      <div class="menu-separator"></div>
+      <button class="menu-item" id="export-pdf"><span class="menu-glyph">PDF</span><span><b>导出 PDF</b><small>打印或保存当前对话为 PDF</small></span></button>
+      <button class="menu-item" id="export-excel"><span class="menu-glyph">XLS</span><span><b>导出 Excel</b><small>导出对话与消息表格</small></span></button>
+      <button class="menu-item" id="export-json"><span class="menu-glyph">{ }</span><span><b>导出 JSON</b><small>完整备份对话与附件</small></span></button>
+      <button class="menu-item" id="import-json"><span class="menu-glyph">↥</span><span><b>导入 JSON</b><small>恢复备份或迁移数据</small></span></button>
+      <div class="menu-separator"></div>
+      <button class="menu-item danger-item" id="clear-current"><span class="menu-glyph">⌫</span><span><b>清除当前历史</b><small>只清除当前 Sidechat 的消息</small></span></button>
+      <button class="menu-item danger-item" id="delete-current-chat"><span class="menu-glyph">−</span><span><b>删除当前 Sidechat</b><small>删除对话、记忆与附件</small></span></button>
+    </div>
+
+    <div class="modal-backdrop" id="settings-modal" hidden>
+      <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head"><div><h2 id="settings-title">设置与偏好</h2><p>配置模型，并管理当前 Sidechat 的记忆</p></div><button class="plain-icon close-settings" aria-label="关闭">×</button></div>
+        <label class="field-label" for="api-key">DeepSeek API Key</label>
+        <div class="key-row"><input id="api-key" type="password" placeholder="sk-…" autocomplete="off"><button id="toggle-key" class="small-outline">显示</button></div>
+        <p class="field-help">仅保存在本机浏览器的 IndexedDB 中，不会写入 GitHub 仓库。直连模式下请勿在共享设备保存密钥。</p>
+        <label class="field-label" for="api-base">API 代理地址（可选）</label>
+        <input id="api-base" type="text" placeholder="留空则直连 https://api.deepseek.com">
+        <p class="field-help">可部署附带的 Cloudflare Worker 代理。使用代理时，可把 API Key 存在 Worker Secret 中，浏览器端 Key 留空。</p>
+        <label class="field-label" for="model-select">模型</label>
+        <select id="model-select"><option value="deepseek-flash">deepseek-flash（图像 / 文档 / 通用）</option><option value="deepseek-v4-pro">deepseek-v4-pro（高能力文本模型）</option></select>
+        <div class="setting-row"><div><b>聊天气泡文字大小</b><small>默认 15px</small></div><strong id="font-size-label">15px</strong></div>
+        <input id="font-size" type="range" min="13" max="22" step="1" value="15">
+        <div class="range-labels"><span>13px</span><span>22px</span></div>
+        <div class="setting-row memory-row"><div><b>自动记住偏好</b><small>从当前对话提取稳定的表达与使用偏好</small></div><label class="switch"><input id="auto-memory" type="checkbox" checked><span></span></label></div>
+        <label class="field-label" for="memory-editor">当前 Sidechat 的偏好记忆</label>
+        <textarea id="memory-editor" rows="4" placeholder="尚未记录偏好。对话中表达的稳定偏好会在这里逐步整理；也可以手动编辑。"></textarea>
+        <div class="settings-actions"><button class="secondary-button close-settings">取消</button><button class="primary-button" id="save-settings">保存设置</button></div>
+        <p class="sheet-footnote">历史记录不设条数上限，保存在浏览器 IndexedDB；实际容量由设备和浏览器存储配额决定。</p>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script defer src="app.js"></script>
+</body>
+</html>
