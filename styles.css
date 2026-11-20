@@ -948,11 +948,11 @@ body.orbs-open #app .float-orb {
 .token-stats-backdrop {
   position: fixed;
   z-index: 20;
-  top: var(--friday-vv-top);
+  top: 0;
   right: 0;
   bottom: auto;
   left: 0;
-  height: var(--friday-vv-height);
+  height: var(--friday-app-height);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -969,7 +969,7 @@ body.orbs-open #app .float-orb {
 .long-editor-sheet,
 .history-picker-sheet {
   width: min(100%, 760px);
-  max-height: calc(var(--friday-vv-height) - 10px);
+  max-height: calc(var(--friday-app-height) - 10px);
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -983,7 +983,7 @@ body.orbs-open #app .float-orb {
 
 .settings-sheet {
   width: min(100%, 560px);
-  max-height: calc(var(--friday-vv-height) - 8px);
+  max-height: calc(var(--friday-app-height) - 8px);
   overflow: auto;
   padding: 9px 21px calc(18px + var(--safe-bottom));
 }
@@ -1371,7 +1371,7 @@ select:focus,
 
 /* Token stats */
 .token-stats-sheet {
-  max-height: min(calc(var(--friday-vv-height) - 16px), 760px);
+  max-height: min(calc(var(--friday-app-height) - 16px), 760px);
 }
 
 .token-stat-grid {
@@ -1835,14 +1835,14 @@ body.orbs-open .edge-zone::after { opacity: 0; }
 
   .settings-sheet {
     border-radius: 23px;
-    max-height: min(calc(var(--friday-vv-height) - 40px), 850px);
+    max-height: min(calc(var(--friday-app-height) - 40px), 850px);
     padding: 12px 28px 23px;
   }
 
   .long-editor-sheet,
   .history-picker-sheet {
     border-radius: 23px;
-    max-height: min(calc(var(--friday-vv-height) - 40px), 850px);
+    max-height: min(calc(var(--friday-app-height) - 40px), 850px);
     padding: 14px 22px 18px;
   }
 
@@ -1913,7 +1913,7 @@ body.orbs-open .edge-zone::after { opacity: 0; }
   .long-editor-sheet,
   .history-picker-sheet,
   .settings-sheet {
-    max-height: var(--friday-vv-height);
+    max-height: var(--friday-app-height);
   }
 
   #long-editor-text {
