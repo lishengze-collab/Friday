@@ -716,7 +716,7 @@
     ].join(',');
 
     const openThreshold = () => Math.max(100, baselineHeight * 0.12);
-    const restoreTolerance = () => Math.max(28, Math.min(52, baselineHeight * 0.045));
+    const restoreTolerance = () => Math.max(18, Math.min(28, baselineHeight * 0.03));
 
     function viewportHeight() {
       return Math.round(viewport?.height || window.innerHeight || baselineHeight);
@@ -796,6 +796,9 @@
           root.style.setProperty('--friday-keyboard-height', savedKeyboardHeight + 'px');
           lastOpenHeight = height;
           applyShell(pagePanTop(), height, true);
+        } else if (!closingFromBlur) {
+          const top = pagePanTop();
+          if (Math.abs(top - lastTop) > 2) applyShell(top, lastHeight, true);
         }
 
         // OS keyboard dismissal without a DOM blur is handled when the viewport
@@ -811,6 +814,13 @@
       }
 
       lastViewportHeight = height;
+    }
+
+    function isEditableTarget(target) {
+      if (!(target instanceof Element)) return false;
+      if (target.matches('textarea, [contenteditable="true"]')) return true;
+      if (!target.matches('input')) return false;
+      return /^(text|search|url|email|password|number|tel)$/i.test(target.type || 'text');
     }
 
     function preLiftBeforeFocus() {
@@ -860,7 +870,7 @@
 
     document.addEventListener('focusin', event => {
       const target = event.target;
-      if (target instanceof Element && target.matches('input, textarea, select, [contenteditable="true"]')) {
+      if (isEditableTarget(target)) {
         ignoreUntilViewportRestored = false;
         if (target === input) preLiftBeforeFocus();
         scheduleSync();
@@ -869,12 +879,10 @@
 
     document.addEventListener('focusout', event => {
       const target = event.target;
-      if (!(target instanceof Element) || !target.matches('input, textarea, select, [contenteditable="true"]')) return;
+      if (!isEditableTarget(target)) return;
       requestAnimationFrame(() => {
         const active = document.activeElement;
-        const anotherEditorIsFocused =
-          active instanceof Element && active.matches('input, textarea, select, [contenteditable="true"]');
-        if (!anotherEditorIsFocused) restoreShellOnBlur();
+        if (!isEditableTarget(active)) restoreShellOnBlur();
         else scheduleSync();
       });
     }, true);
