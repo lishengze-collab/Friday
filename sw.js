@@ -1,5 +1,5 @@
 const CACHE = 'sidechat-shell-v2';
-const ASSETS = ['./', './index.html', './styles.css', './app.js', './enhancements.js', './manifest.webmanifest', './icon.svg', './icon.png', './icon-192.png', './icon-512.png', './worker.js'];
+const ASSETS = ['./', './index.html', './styles.css', './app.js', './app.bundle.gz.b64', './enhancements.js', './manifest.webmanifest', './icon.svg', './icon.png', './icon-192.png', './icon-512.png', './worker.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
