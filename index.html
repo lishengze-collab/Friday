@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120n');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120o');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -458,8 +458,9 @@
         const role = row.classList.contains('assistant') ? 'Friday' : '我';
         // Keep only a compact excerpt; the surrounding chat history already
         // supplies the full conversational context when this follow-up is sent.
-        const excerpt = text.length > 120
-          ? text.slice(0, 120).trimEnd() + '…'
+        const excerptChars = Array.from(text);
+        const excerpt = excerptChars.length > 5
+          ? excerptChars.slice(0, 5).join('') + '…'
           : text;
         const block = (input.value.trim() ? '\n\n' : '') +
           '【追问引用 · ' + role + '】\n' +
