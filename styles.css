@@ -518,7 +518,61 @@ html.friday-keyboard-open .composer-wrap {
   max-width: 920px;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
+/* One-line quote preview inside the composer; it never expands the textarea. */
+.quote-preview {
+  order: -1;
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  height: 23px;
+  min-height: 23px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  margin: 0 1px 4px;
+  padding: 0 7px;
+  border-left: 2px solid var(--wa-green);
+  border-radius: 7px;
+  background: rgba(0, 128, 105, .055);
+}
+
+.quote-preview[hidden] { display: none !important; }
+
+.quote-preview-label {
+  flex: 0 0 auto;
+  color: var(--wa-green);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.quote-preview-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: #64756d;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#clear-quote-button {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #7b8983;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+}
+#clear-quote-button:active { background: rgba(0,0,0,.06); }
+
   gap: 7px;
   margin: 0 auto;
   padding: 6px 7px;
