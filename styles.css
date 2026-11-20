@@ -67,13 +67,14 @@ select:focus-visible {
 }
 
 #app {
+  /* One stable shell: never move the top edge when the keyboard opens. */
   position: fixed;
-  top: var(--friday-vv-top);
+  top: 0;
   right: 0;
   bottom: auto;
   left: 0;
   width: 100%;
-  height: var(--friday-vv-height);
+  height: var(--friday-app-height, 100dvh);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -464,6 +465,11 @@ select:focus-visible {
   padding: 8px 12px calc(8px + var(--safe-bottom));
   border: 0;
   background: rgba(239, 234, 226, .98);
+}
+
+/* When the software keyboard is open, keep a constant 8px keyboard-to-composer gap. */
+html.friday-keyboard-open .composer-wrap {
+  padding-bottom: 8px;
 }
 
 .composer {
