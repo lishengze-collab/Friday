@@ -177,25 +177,24 @@
       height: 100%;
       margin: 0;
       overflow: hidden !important;
-      overscroll-behavior: none;
-      /* 增加以下两行，锁死整个页面防止拖动 */
-      position: fixed;
-      inset: 0;
+      overscroll-behavior: none !important;
     }
 
     body {
       min-height: 0;
     }
 
+    /* Anchor the app to the visible viewport, including iOS keyboard panning. */
     #app {
-      /* 增加以下绝对定位，确保应用跟随高度变量收缩且不产生整体滚动 */
-      position: absolute;
-      top: 0;
-      left: 0;
+      position: fixed !important;
+      top: var(--friday-visual-top, 0px) !important;
+      right: 0 !important;
+      bottom: auto !important;
+      left: 0 !important;
       width: 100%;
       height: var(--friday-viewport-height, 100dvh) !important;
       min-height: 0 !important;
-      overflow: hidden;
+      overflow: hidden !important;
     }
   </style>
 
@@ -400,23 +399,61 @@
       const display = `${num(chars)} 字符 · ${num(tokens)} Tokens`;
       if (line && line.textContent !== display) line.textContent = display;
     }
+    let headerRefreshTimer = 0;
+    let headerRefreshPending = false;
+
+    function scheduleHeaderRefresh() {
+      if (headerRefreshTimer) clearTimeout(headerRefreshTimer);
+      headerRefreshTimer = setTimeout(() => {
+        headerRefreshTimer = 0;
+        refreshHeader();
+      }, 260);
+    }
+
     async function refreshHeader() {
-      if (statsBusy) return;
+      if (statsBusy) {
+        headerRefreshPending = true;
+        return;
+      }
       statsBusy = true;
       try {
         const data = await readStores(['chats','messages','settings']);
         setHeaderText(data.chats, data.messages, data.settings);
       } catch (error) { console.warn('Friday header stats unavailable:', error); }
-      finally { statsBusy = false; }
+      finally {
+        statsBusy = false;
+        if (headerRefreshPending) {
+          headerRefreshPending = false;
+          scheduleHeaderRefresh();
+        }
+      }
     }
+
     function installHeaderObserver() {
       refreshHeader();
-      const observer = new MutationObserver(() => refreshHeader());
-      const list = byId('chat-list'), messageArea = byId('messages'), titleNode = byId('active-chat-title');
-      if (list) observer.observe(list, { childList:true, subtree:true, attributes:true, attributeFilter:['class'] });
-      if (messageArea) observer.observe(messageArea, { childList:true, subtree:true, characterData:true });
-      if (titleNode) observer.observe(titleNode, { childList:true, characterData:true, subtree:true });
-      setInterval(refreshHeader, 1800);
+      const observer = new MutationObserver(scheduleHeaderRefresh);
+      const list = byId('chat-list');
+      const messageArea = byId('messages');
+      const titleNode = byId('active-chat-title');
+
+      if (list) observer.observe(list, {
+        childList:true,
+        subtree:true,
+        attributes:true,
+        attributeFilter:['class']
+      });
+
+      // Ignore high-frequency characterData changes; update once after message DOM settles.
+      if (messageArea) observer.observe(messageArea, {
+        childList:true,
+        subtree:true
+      });
+
+      if (titleNode) observer.observe(titleNode, {
+        childList:true,
+        characterData:true,
+        subtree:true
+      });
     }
 
     function ensureOverlayStyles() {
@@ -751,79 +788,59 @@
   (() => {
     'use strict';
 
-    if (window.__fridayNativeKeyboardFixV2) return;
-    window.__fridayNativeKeyboardFixV2 = true;
+    if (window.__fridayNativeKeyboardFixV3) return;
+    window.__fridayNativeKeyboardFixV3 = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
-
     let rafId = 0;
+    let appliedTop = -1;
+    let appliedHeight = -1;
 
-    // 同步当前可视区域高度
+    // Keep the app aligned with BOTH visualViewport.offsetTop and height.
+    // On iOS, the browser may pan the visual viewport when an input receives focus.
     function updateViewport() {
       if (rafId) return;
 
       rafId = requestAnimationFrame(() => {
         rafId = 0;
 
-        const height =
-          viewport && viewport.scale <= 1.01
-            ? viewport.height
-            : window.innerHeight;
+        let top = 0;
+        let height = window.innerHeight || root.clientHeight || 0;
 
-        if (height > 0) {
-          root.style.setProperty(
-            '--friday-viewport-height',
-            Math.round(height) + 'px'
-          );
+        if (viewport && Math.abs((viewport.scale || 1) - 1) < 0.02) {
+          top = viewport.offsetTop || 0;
+          height = viewport.height || height;
+        }
+
+        const nextTop = Math.max(0, Math.round(top));
+        const nextHeight = Math.max(1, Math.round(height));
+
+        // Avoid needless style writes and layout recalculations.
+        if (nextTop !== appliedTop) {
+          root.style.setProperty('--friday-visual-top', nextTop + 'px');
+          appliedTop = nextTop;
+        }
+
+        if (nextHeight !== appliedHeight) {
+          root.style.setProperty('--friday-viewport-height', nextHeight + 'px');
+          appliedHeight = nextHeight;
         }
       });
     }
 
-    // 键盘弹出或收起时，浏览器可视区域发生变化
     if (viewport) {
-      viewport.addEventListener(
-        'resize',
-        updateViewport,
-        { passive: true }
-      );
+      viewport.addEventListener('resize', updateViewport, { passive: true });
+      viewport.addEventListener('scroll', updateViewport, { passive: true });
     }
 
-    // 浏览器窗口尺寸变化
-    window.addEventListener(
-      'resize',
-      updateViewport,
-      { passive: true }
-    );
+    window.addEventListener('resize', updateViewport, { passive: true });
+    window.addEventListener('orientationchange', updateViewport, { passive: true });
+    window.addEventListener('pageshow', updateViewport);
+    document.addEventListener('focusin', updateViewport, true);
+    document.addEventListener('focusout', updateViewport, true);
 
-    // 输入框获得或失去焦点
-    document.addEventListener(
-      'focusin',
-      updateViewport,
-      true
-    );
-
-    document.addEventListener(
-      'focusout',
-      updateViewport,
-      true
-    );
-
-    // 页面恢复或屏幕方向变化
-    window.addEventListener(
-      'pageshow',
-      updateViewport
-    );
-
-    window.addEventListener(
-      'orientationchange',
-      updateViewport,
-      { passive: true }
-    );
-
-    // 初始化
     updateViewport();
-
   })();
   </script>
 
