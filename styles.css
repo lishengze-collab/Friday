@@ -364,6 +364,22 @@ select:focus-visible {
   font-size: 11px;
 }
 
+.message-meta .friday-reply-action {
+  margin-left: 5px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 7px;
+  color: #547267;
+  background: rgba(0, 128, 105, .07);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.message-meta .friday-reply-action:active {
+  background: rgba(0, 128, 105, .14);
+}
+
 .message-token-count {
   color: #92a197;
   font-size: 9px;
