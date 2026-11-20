@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120l');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120m');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -149,10 +149,11 @@
         const chatId = row?.dataset.chatId || activeChatId || 'unknown';
         const response = await originalFetch(input, init);
         if (isCompletion && response.ok) {
-          try {
-            const data = await response.clone().json();
-            if (data?.usage) await appendTrendUsage(chatId, model, data.usage);
-          } catch (error) { console.warn('Friday Token trend capture skipped:', error); }
+          // Usage history is auxiliary: persist it asynchronously so it cannot delay
+          // the application from receiving or rendering the model response.
+          void response.clone().json()
+            .then(data => data?.usage ? appendTrendUsage(chatId, model, data.usage) : undefined)
+            .catch(error => console.warn('Friday Token trend capture skipped:', error));
         }
         return response;
       };
@@ -434,6 +435,82 @@
       foot.append(source,close);modal.sheet.append(grid,trend,detail,chatHead,chats,foot);
     }
 
+    function installMessageReplyActions() {
+      const root = byId('messages');
+      if (!root || window.__fridayMessageReplyActionsInstalled) return;
+      window.__fridayMessageReplyActionsInstalled = true;
+
+      function plainMessageText(row) {
+        const bubble = row.querySelector('.bubble');
+        if (!bubble) return '';
+        const copy = bubble.cloneNode(true);
+        copy.querySelectorAll('.message-meta, .friday-reply-action, button').forEach(node => node.remove());
+        return String(copy.innerText || copy.textContent || '').replace(/\u00a0/g, ' ').trim();
+      }
+
+      function appendQuoteToComposer(row) {
+        const input = byId('message-input');
+        if (!input) return;
+        const bubble = row.querySelector('.bubble');
+        if (!bubble) return;
+
+        const text = plainMessageText(row);
+        if (!text) return;
+
+        const role = row.classList.contains('assistant') ? 'Friday 的回复' : '我之前发送的消息';
+        const chatTitle = String(byId('active-chat-title')?.textContent || '当前对话').trim();
+        const maxChars = 2800;
+        const quote = text.length > maxChars
+          ? text.slice(0, 1850) + '\n…（中间内容已省略）…\n' + text.slice(-850)
+          : text;
+        const quoted = quote.split(/\r?\n/).map(line => '> ' + line).join('\n');
+        const block = '\n\n【引用追问｜' + chatTitle + '｜' + role + '】\n' +
+          quoted +
+          '\n\n请围绕这条消息继续回答：';
+
+        const inputIsFocused = document.activeElement === input;
+        const start = inputIsFocused ? input.selectionStart : input.value.length;
+        const end = inputIsFocused ? input.selectionEnd : input.value.length;
+        const prefix = start > 0 && !/\n\s*$/.test(input.value.slice(0, start)) ? '\n\n' : '';
+        input.setRangeText(prefix + block, start, end, 'end');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+        const caret = input.value.length;
+        input.setSelectionRange(caret, caret);
+      }
+
+      function addButtons() {
+        root.querySelectorAll('.message-row').forEach(row => {
+          const meta = row.querySelector('.message-meta');
+          if (!meta || meta.querySelector('.friday-reply-action')) return;
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'friday-reply-action';
+          button.textContent = '↩ 追问';
+          button.title = '引用这条消息并继续追问';
+          button.setAttribute('aria-label', '引用这条消息并继续追问');
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            appendQuoteToComposer(row);
+          });
+          meta.appendChild(button);
+        });
+      }
+
+      let scheduled = false;
+      const schedule = () => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+          scheduled = false;
+          addButtons();
+        });
+      };
+      addButtons();
+      new MutationObserver(schedule).observe(root, { childList: true, subtree: true });
+    }
+
     function installControls() {
       if (window.__fridayExtraUiInstalled) return true;
       if (!document.querySelector('#chat-list .chat-list-item') || !byId('messages')?.children.length) return false;
@@ -448,6 +525,7 @@
         }
       },true);
       installHeaderObserver();
+      installMessageReplyActions();
       return true;
     }
     const timer=setInterval(()=>{if(installControls())clearInterval(timer);},180);
@@ -602,8 +680,8 @@
   <script id="friday-viewport-shell">
   (() => {
     'use strict';
-    if (window.__fridayNativeChatShell) return;
-    window.__fridayNativeChatShell = true;
+    if (window.__fridayNativeChatShellV2) return;
+    window.__fridayNativeChatShellV2 = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
@@ -611,14 +689,17 @@
     const input = document.getElementById('message-input');
 
     let frame = 0;
-    let baselineHeight = viewport?.height || window.innerHeight || 1;
+    let baselineHeight = Math.round(viewport?.height || window.innerHeight || 1);
     let savedKeyboardHeight = 0;
-    let keyboardVisible = false;
+    let keyboardOpen = false;
+    let closingFromBlur = false;
+    let lastOpenHeight = 0;
     let lastTop = -1;
     let lastHeight = -1;
+    let lastViewportHeight = baselineHeight;
     let lastTouchY = null;
     let touchScroller = null;
-    let preLiftTimer = 0;
+    let ignoreUntilViewportRestored = false;
 
     const scrollSelector = [
       '#chat-scroll',
@@ -633,6 +714,13 @@
       '#message-input',
       '.bubble pre'
     ].join(',');
+
+    const openThreshold = () => Math.max(100, baselineHeight * 0.12);
+    const restoreTolerance = () => Math.max(28, Math.min(52, baselineHeight * 0.045));
+
+    function viewportHeight() {
+      return Math.round(viewport?.height || window.innerHeight || baselineHeight);
+    }
 
     function pagePanTop() {
       if (!viewport) return 0;
@@ -655,48 +743,106 @@
         root.style.setProperty('--friday-vv-height', nextHeight + 'px');
         lastHeight = nextHeight;
       }
-      if (keyboardVisible !== open) {
-        keyboardVisible = open;
-        root.classList.toggle('friday-keyboard-open', open);
-      }
+      root.classList.toggle('friday-keyboard-open', !!open);
+    }
+
+    function scheduleSync() {
+      if (frame) return;
+      frame = requestAnimationFrame(syncViewport);
     }
 
     function syncViewport() {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        const visibleHeight = viewport?.height || window.innerHeight || baselineHeight;
-        const keyboardDelta = Math.max(0, baselineHeight - visibleHeight);
-        const threshold = Math.max(100, baselineHeight * 0.12);
-        const open = keyboardDelta > threshold;
+      frame = 0;
+      const height = viewportHeight();
 
-        if (open) {
-          savedKeyboardHeight = keyboardDelta;
-          root.style.setProperty('--friday-keyboard-height', Math.round(keyboardDelta) + 'px');
-          root.classList.remove('friday-keyboard-prelift');
-          applyShell(pagePanTop(), visibleHeight, true);
-        } else {
-          root.style.setProperty('--friday-keyboard-height', '0px');
-          root.classList.remove('friday-keyboard-prelift');
-          applyShell(0, visibleHeight, false);
-          baselineHeight = visibleHeight;
+      // While a blur-triggered keyboard animation is running, keep the shell
+      // restored and ignore the intermediate visualViewport resize frames.
+      if (ignoreUntilViewportRestored) {
+        if (height < baselineHeight - restoreTolerance()) {
+          lastViewportHeight = height;
+          return;
         }
-      });
+        ignoreUntilViewportRestored = false;
+        closingFromBlur = false;
+        baselineHeight = height;
+        root.classList.remove('friday-keyboard-prelift');
+        root.style.setProperty('--friday-keyboard-height', '0px');
+        applyShell(0, height, false);
+        lastViewportHeight = height;
+        return;
+      }
+
+      const keyboardDelta = Math.max(0, baselineHeight - height);
+
+      if (!keyboardOpen) {
+        if (keyboardDelta > openThreshold()) {
+          keyboardOpen = true;
+          closingFromBlur = false;
+          savedKeyboardHeight = Math.round(keyboardDelta);
+          root.style.setProperty('--friday-keyboard-height', savedKeyboardHeight + 'px');
+          root.classList.remove('friday-keyboard-prelift');
+          lastOpenHeight = height;
+          applyShell(pagePanTop(), height, true);
+        } else {
+          baselineHeight = height;
+          root.classList.remove('friday-keyboard-prelift');
+          applyShell(0, height, false);
+        }
+      } else {
+        // While opening, allow only meaningful keyboard-height changes to
+        // reach layout; ignore tiny browser viewport oscillations.
+        if (!closingFromBlur && height < lastOpenHeight - 38) {
+          savedKeyboardHeight = Math.round(Math.max(0, baselineHeight - height));
+          root.style.setProperty('--friday-keyboard-height', savedKeyboardHeight + 'px');
+          lastOpenHeight = height;
+          applyShell(pagePanTop(), height, true);
+        }
+
+        // OS keyboard dismissal without a DOM blur is handled when the viewport
+        // has nearly returned to its pre-keyboard height.
+        if (keyboardOpen && keyboardDelta <= restoreTolerance()) {
+          keyboardOpen = false;
+          closingFromBlur = false;
+          root.classList.remove('friday-keyboard-prelift');
+          root.style.setProperty('--friday-keyboard-height', '0px');
+          applyShell(0, baselineHeight, false);
+          baselineHeight = height;
+        }
+      }
+
+      lastViewportHeight = height;
     }
 
     function preLiftBeforeFocus() {
-      if (!savedKeyboardHeight || keyboardVisible) return;
-      root.style.setProperty('--friday-keyboard-height', Math.round(savedKeyboardHeight) + 'px');
+      if (!savedKeyboardHeight || keyboardOpen) return;
+      ignoreUntilViewportRestored = false;
+      root.style.setProperty('--friday-vv-height', baselineHeight + 'px');
+      root.style.setProperty('--friday-keyboard-height', savedKeyboardHeight + 'px');
       root.classList.add('friday-keyboard-prelift');
-      clearTimeout(preLiftTimer);
-      preLiftTimer = setTimeout(() => {
-        if (!keyboardVisible) root.classList.remove('friday-keyboard-prelift');
-      }, 900);
     }
 
-    // Intercept the first focus on the composer before Safari performs its
-    // visibility check. This is the important step that post-focus resize
-    // listeners cannot provide.
+    function restoreShellOnBlur() {
+      if (!keyboardOpen) {
+        scheduleSync();
+        return;
+      }
+      const currentHeight = viewportHeight();
+      keyboardOpen = false;
+      closingFromBlur = true;
+      ignoreUntilViewportRestored = currentHeight < baselineHeight - restoreTolerance();
+      root.classList.remove('friday-keyboard-open', 'friday-keyboard-prelift');
+      root.style.setProperty('--friday-keyboard-height', '0px');
+
+      // One synchronous geometry reset, instead of following every iOS
+      // keyboard-dismiss animation frame and repeatedly reflowing the chat.
+      applyShell(0, baselineHeight, false);
+
+      if (!ignoreUntilViewportRestored) {
+        baselineHeight = currentHeight;
+        closingFromBlur = false;
+      }
+    }
+
     if (composer && input && window.matchMedia?.('(pointer: coarse)').matches) {
       input.addEventListener('mousedown', event => {
         if (document.activeElement === input) return;
@@ -712,8 +858,27 @@
       }, true);
     }
 
-    // Only the message list and explicitly scrollable sheets may consume a
-    // vertical swipe. The page, header, and composer chrome never do.
+    document.addEventListener('focusin', event => {
+      const target = event.target;
+      if (target instanceof Element && target.matches('input, textarea, select, [contenteditable="true"]')) {
+        ignoreUntilViewportRestored = false;
+        if (target === input) preLiftBeforeFocus();
+        scheduleSync();
+      }
+    }, true);
+
+    document.addEventListener('focusout', event => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.matches('input, textarea, select, [contenteditable="true"]')) return;
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        const anotherEditorIsFocused =
+          active instanceof Element && active.matches('input, textarea, select, [contenteditable="true"]');
+        if (!anotherEditorIsFocused) restoreShellOnBlur();
+        else scheduleSync();
+      });
+    }, true);
+
     document.addEventListener('touchstart', event => {
       const target = event.target instanceof Element ? event.target : null;
       touchScroller = target ? target.closest(scrollSelector) : null;
@@ -731,8 +896,6 @@
         event.preventDefault();
         return;
       }
-
-      // Native text selection and textarea editing stay under iOS control.
       if (touchScroller.matches('#message-input')) return;
 
       const maxScroll = touchScroller.scrollHeight - touchScroller.clientHeight;
@@ -740,12 +903,9 @@
         event.preventDefault();
         return;
       }
-
       const atTop = touchScroller.scrollTop <= 1;
       const atBottom = touchScroller.scrollTop >= maxScroll - 1;
-      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
-        event.preventDefault();
-      }
+      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) event.preventDefault();
     }, { passive: false, capture: true });
 
     const releaseTouch = () => {
@@ -756,31 +916,38 @@
     document.addEventListener('touchcancel', releaseTouch, { passive: true, capture: true });
 
     if (viewport) {
-      viewport.addEventListener('resize', syncViewport, { passive: true });
-      viewport.addEventListener('scroll', syncViewport, { passive: true });
+      viewport.addEventListener('resize', scheduleSync, { passive: true });
+      viewport.addEventListener('scroll', scheduleSync, { passive: true });
     }
-    window.addEventListener('resize', syncViewport, { passive: true });
+    window.addEventListener('resize', scheduleSync, { passive: true });
     window.addEventListener('orientationchange', () => {
       savedKeyboardHeight = 0;
-      baselineHeight = window.innerHeight || viewport?.height || baselineHeight;
+      keyboardOpen = false;
+      closingFromBlur = false;
+      ignoreUntilViewportRestored = false;
+      baselineHeight = Math.round(window.innerHeight || viewport?.height || baselineHeight);
       root.classList.remove('friday-keyboard-prelift', 'friday-keyboard-open');
       root.style.setProperty('--friday-keyboard-height', '0px');
-      requestAnimationFrame(syncViewport);
+      scheduleSync();
     }, { passive: true });
+
     window.addEventListener('pageshow', () => {
-      baselineHeight = viewport?.height || window.innerHeight || baselineHeight;
-      syncViewport();
+      baselineHeight = viewportHeight();
+      savedKeyboardHeight = 0;
+      keyboardOpen = false;
+      closingFromBlur = false;
+      ignoreUntilViewportRestored = false;
+      root.classList.remove('friday-keyboard-prelift', 'friday-keyboard-open');
+      root.style.setProperty('--friday-keyboard-height', '0px');
+      applyShell(0, baselineHeight, false);
+      scheduleSync();
     });
-    document.addEventListener('focusin', syncViewport, true);
-    document.addEventListener('focusout', () => requestAnimationFrame(syncViewport), true);
 
-    // Safety net for OS keyboard switches where no DOM pre-focus event fires.
-    function keepDocumentAtOrigin() {
-      if (keyboardVisible && window.scrollY > 0) window.scrollTo(0, 0);
-    }
-    window.addEventListener('scroll', keepDocumentAtOrigin, { passive: true });
+    window.addEventListener('scroll', () => {
+      if (keyboardOpen && window.scrollY > 0) window.scrollTo(0, 0);
+    }, { passive: true });
 
-    syncViewport();
+    scheduleSync();
   })();
   </script>
 
