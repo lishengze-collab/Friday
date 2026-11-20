@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120e');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120f');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -668,6 +668,28 @@
     window.addEventListener('pageshow', syncViewport);
     document.addEventListener('focusin', syncViewport, true);
     document.addEventListener('focusout', syncViewport, true);
+
+    // The composer frame itself is fixed; only its editable controls remain interactive.
+    const composer = document.getElementById('composer-wrap');
+    if (composer) {
+      let lockComposerSurface = false;
+
+      composer.addEventListener('touchstart', event => {
+        lockComposerSurface = !event.target.closest(
+          'textarea, input, button, select, a, [contenteditable="true"]'
+        );
+      }, { passive: true });
+
+      composer.addEventListener('touchmove', event => {
+        if (lockComposerSurface) event.preventDefault();
+      }, { passive: false });
+
+      const releaseComposerSurface = () => {
+        lockComposerSurface = false;
+      };
+      composer.addEventListener('touchend', releaseComposerSurface, { passive: true });
+      composer.addEventListener('touchcancel', releaseComposerSurface, { passive: true });
+    }
 
     syncViewport();
   })();
