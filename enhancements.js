@@ -192,6 +192,7 @@
   window.fetch = async function(input, init) {
     const isCompletion = isChatCompletionUrl(input);
     let nextInit = init;
+    let inspectResponse = false;
     if (isCompletion && init?.body && typeof init.body === 'string') {
       try {
         const body = JSON.parse(init.body);
@@ -202,6 +203,10 @@
         const decision = automatic
           ? decideRequestMode(body.messages)
           : { search: prefs.webSearch, deepThinking: prefs.deepThinking, urlProvided: containsUrl(extractLatestUserText(body.messages)) };
+
+        // For ordinary turns the original Response can go straight to the app.
+        // Only parse a clone when web citations or reasoning metadata are needed.
+        inspectResponse = !!(decision.search || decision.deepThinking || decision.urlProvided);
 
         if (decision.search) addPreviousToolContext(body);
 
@@ -233,7 +238,7 @@
       } catch (error) { console.warn('Sidechat request options could not be applied:', error); }
     }
     const response = await nativeFetch(input, nextInit);
-    if (!isCompletion || !response.ok) return response;
+    if (!isCompletion || !response.ok || !inspectResponse) return response;
     try {
       const data = await response.clone().json();
       const message = data?.choices?.[0]?.message;
