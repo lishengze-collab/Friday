@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120g');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120h');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -603,60 +603,116 @@
   (() => {
     'use strict';
 
-    if (window.__fridayViewportShellV6) return;
-    window.__fridayViewportShellV6 = true;
+    if (window.__fridayNativeChatShell) return;
+    window.__fridayNativeChatShell = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
-    const KEYBOARD_GAP = 2;
+    const composer = document.getElementById('composer-wrap');
+    const input = document.getElementById('message-input');
+
     let frame = 0;
-    let fullVisualHeight = window.innerHeight || root.clientHeight || 1;
-    let keyboardOpen = false;
+    let baselineHeight = viewport?.height || window.innerHeight || 1;
+    let keyboardHeight = 0;
+    let savedKeyboardHeight = 0;
+    let keyboardVisible = false;
     let lastTop = -1;
     let lastHeight = -1;
-    let lastTouchY = null;
+    let preLiftTimer = 0;
+
+    const isTextEntry = element =>
+      element instanceof Element &&
+      !!element.closest('textarea, input:not([type="file"]), select, [contenteditable="true"]');
+
+    function visualPanTop() {
+      if (!viewport) return 0;
+      const pageTop = Number(viewport.pageTop);
+      const offsetTop = Number(viewport.offsetTop);
+      const documentScroll = window.scrollY || document.documentElement.scrollTop || 0;
+      const fromPageTop = Number.isFinite(pageTop) ? Math.max(0, pageTop - documentScroll) : 0;
+      return Math.max(0, fromPageTop, Number.isFinite(offsetTop) ? offsetTop : 0);
+    }
+
+    function applyShell(top, height, open) {
+      const nextTop = Math.round(Math.max(0, top));
+      const nextHeight = Math.round(Math.max(1, height));
+
+      if (nextTop !== lastTop) {
+        root.style.setProperty('--friday-vv-top', nextTop + 'px');
+        lastTop = nextTop;
+      }
+      if (nextHeight !== lastHeight) {
+        root.style.setProperty('--friday-vv-height', nextHeight + 'px');
+        lastHeight = nextHeight;
+      }
+      if (keyboardVisible !== open) {
+        keyboardVisible = open;
+        root.classList.toggle('friday-keyboard-open', open);
+      }
+    }
 
     function syncViewport() {
       if (frame) return;
-
       frame = requestAnimationFrame(() => {
         frame = 0;
 
-        const layoutHeight = window.innerHeight || root.clientHeight || fullVisualHeight;
-        let top = 0;
-        let visibleHeight = layoutHeight;
+        const visibleHeight = viewport?.height || window.innerHeight || baselineHeight;
+        const layoutHeight = window.innerHeight || baselineHeight;
+        const focused = isTextEntry(document.activeElement);
+        const measuredKeyboard = Math.max(0, baselineHeight - visibleHeight);
+        const open = focused && measuredKeyboard > Math.max(100, baselineHeight * 0.12);
 
-        if (viewport && viewport.scale >= 0.98 && viewport.scale <= 1.02) {
-          top = Math.max(0, viewport.offsetTop || 0);
-          visibleHeight = viewport.height || layoutHeight;
+        if (open) {
+          keyboardHeight = measuredKeyboard;
+          savedKeyboardHeight = measuredKeyboard;
+          root.style.setProperty('--friday-keyboard-height', Math.round(measuredKeyboard) + 'px');
+          root.classList.remove('friday-keyboard-prelift');
+          applyShell(visualPanTop(), visibleHeight, true);
+        } else if (!focused || measuredKeyboard < 60) {
+          keyboardHeight = 0;
+          root.style.setProperty('--friday-keyboard-height', '0px');
+          root.classList.remove('friday-keyboard-prelift');
+          applyShell(0, layoutHeight, false);
+          if (!focused) baselineHeight = viewport?.height || layoutHeight;
+        } else {
+          // Keyboard is animating: follow its live visual viewport, not the document.
+          applyShell(visualPanTop(), visibleHeight, true);
         }
+      });
+    }
 
-        const nextKeyboardOpen =
-          (fullVisualHeight - visibleHeight) > Math.max(110, fullVisualHeight * 0.13);
+    function preLiftBeforeFocus() {
+      if (!savedKeyboardHeight || keyboardVisible) return;
+      root.style.setProperty('--friday-keyboard-height', Math.round(savedKeyboardHeight) + 'px');
+      root.classList.add('friday-keyboard-prelift');
+      clearTimeout(preLiftTimer);
+      preLiftTimer = setTimeout(() => {
+        if (!keyboardVisible) root.classList.remove('friday-keyboard-prelift');
+      }, 900);
+    }
 
-        // On keyboard open, subtract only the intentional 2px visual gap.
-        const appHeight = Math.max(1, visibleHeight - (nextKeyboardOpen ? KEYBOARD_GAP : 0));
-        const roundedTop = Math.round(top);
-        const roundedHeight = Math.round(appHeight);
-
-        if (roundedTop !== lastTop) {
-          root.style.setProperty('--friday-vv-top', roundedTop + 'px');
-          lastTop = roundedTop;
+    // On iOS the browser's focus visibility check can scroll the visual viewport
+    // before the keyboard appears. Take focus on mousedown with preventScroll,
+    // after pre-lifting to the last measured keyboard position when available.
+    if (composer && input && window.matchMedia?.('(pointer: coarse)').matches) {
+      input.addEventListener('mousedown', event => {
+        if (document.activeElement === input) return;
+        event.preventDefault();
+        preLiftBeforeFocus();
+        try {
+          input.focus({ preventScroll: true });
+          const end = input.value.length;
+          input.setSelectionRange(end, end);
+        } catch (_) {
+          input.focus();
         }
+        syncViewport();
+      }, true);
 
-        if (roundedHeight !== lastHeight) {
-          root.style.setProperty('--friday-vv-height', roundedHeight + 'px');
-          lastHeight = roundedHeight;
-        }
-
-        if (nextKeyboardOpen !== keyboardOpen) {
-          keyboardOpen = nextKeyboardOpen;
-          root.classList.toggle('friday-keyboard-open', keyboardOpen);
-        }
-
-        if (!keyboardOpen && layoutHeight > 0) {
-          fullVisualHeight = visibleHeight;
-        }
+      composer.querySelectorAll('button').forEach(button => {
+        button.addEventListener('mousedown', () => {
+          if (keyboardVisible && savedKeyboardHeight) preLiftBeforeFocus();
+        }, true);
       });
     }
 
@@ -664,94 +720,33 @@
       viewport.addEventListener('resize', syncViewport, { passive: true });
       viewport.addEventListener('scroll', syncViewport, { passive: true });
     }
-
     window.addEventListener('resize', syncViewport, { passive: true });
     window.addEventListener('orientationchange', () => {
-      requestAnimationFrame(() => {
-        fullVisualHeight = window.innerHeight || root.clientHeight || fullVisualHeight;
-        syncViewport();
-      });
+      savedKeyboardHeight = 0;
+      keyboardHeight = 0;
+      baselineHeight = window.innerHeight || viewport?.height || baselineHeight;
+      root.classList.remove('friday-keyboard-prelift', 'friday-keyboard-open');
+      root.style.setProperty('--friday-keyboard-height', '0px');
+      requestAnimationFrame(syncViewport);
     }, { passive: true });
-    window.addEventListener('pageshow', syncViewport);
+    window.addEventListener('pageshow', () => {
+      baselineHeight = viewport?.height || window.innerHeight || baselineHeight;
+      syncViewport();
+    });
     document.addEventListener('focusin', syncViewport, true);
-    document.addEventListener('focusout', syncViewport, true);
+    document.addEventListener('focusout', () => {
+      // Wait for iOS to begin closing the keyboard before restoring the full shell.
+      requestAnimationFrame(syncViewport);
+    }, true);
 
-    // Lock the document's touch surface. Only message/history panels may scroll.
-    // At scroll boundaries, stop touch chaining so the page itself never rubber-bands.
-    const scrollAllowlist = [
-      '#chat-scroll',
-      '.float-panel',
-      '.settings-sheet',
-      '.long-editor-sheet',
-      '.history-picker-sheet',
-      '.history-list',
-      '.token-chat-usage',
-      '#message-input',
-      '#long-editor-text',
-      '.bubble pre',
-      '.src-fold-body'
-    ].join(',');
-
-    function getScrollSurface(target) {
-      return target instanceof Element ? target.closest(scrollAllowlist) : null;
+    // Safety net only: keep the root document at y=0 while the keyboard is open.
+    function lockDocumentScroll() {
+      if (!keyboardVisible) return;
+      if ((window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) > 0) {
+        window.scrollTo(0, 0);
+      }
     }
-
-    document.addEventListener('touchstart', event => {
-      lastTouchY = event.touches[0]?.clientY ?? null;
-    }, { passive: true, capture: true });
-
-    document.addEventListener('touchmove', event => {
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      const currentY = touch.clientY;
-      const deltaY = lastTouchY == null ? 0 : currentY - lastTouchY;
-      lastTouchY = currentY;
-
-      const target = event.target instanceof Element ? event.target : null;
-      const surface = target ? getScrollSurface(target) : null;
-
-      if (!surface) {
-        event.preventDefault();
-        return;
-      }
-
-      // Editable controls keep native cursor selection and text editing.
-      if (surface.matches('textarea, input, [contenteditable="true"]')) return;
-
-      const maxScroll = surface.scrollHeight - surface.clientHeight;
-      if (maxScroll <= 1) {
-        event.preventDefault();
-        return;
-      }
-
-      const atTop = surface.scrollTop <= 1;
-      const atBottom = surface.scrollTop >= maxScroll - 1;
-      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
-        event.preventDefault();
-      }
-    }, { passive: false, capture: true });
-
-    const resetTouch = () => { lastTouchY = null; };
-    document.addEventListener('touchend', resetTouch, { passive: true, capture: true });
-    document.addEventListener('touchcancel', resetTouch, { passive: true, capture: true });
-
-    // Do not allow the browser's document-level wheel gesture to move the shell.
-    document.addEventListener('wheel', event => {
-      const target = event.target instanceof Element ? event.target : null;
-      const surface = target ? getScrollSurface(target) : null;
-      if (!surface) {
-        event.preventDefault();
-        return;
-      }
-      if (surface.matches('textarea, input, [contenteditable="true"]')) return;
-      const maxScroll = surface.scrollHeight - surface.clientHeight;
-      if (maxScroll <= 1 ||
-          (surface.scrollTop <= 1 && event.deltaY < 0) ||
-          (surface.scrollTop >= maxScroll - 1 && event.deltaY > 0)) {
-        event.preventDefault();
-      }
-    }, { passive: false, capture: true });
+    window.addEventListener('scroll', lockDocumentScroll, { passive: true });
 
     syncViewport();
   })();
