@@ -12,15 +12,79 @@
   <link rel="apple-touch-icon" href="icon.png?v=2">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    /* Bump the Friday service-worker script URL so a newly uploaded index can refresh old cached shells. */
+    (() => {
+      if (!('serviceWorker' in navigator) || navigator.__fridaySwVersionHook) return;
+      const originalRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+      navigator.serviceWorker.register = (scriptURL, options) => {
+        try {
+          const url = new URL(scriptURL, location.href);
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120a');
+          return originalRegister(url.href, options);
+        } catch (_) { return originalRegister(scriptURL, options); }
+      };
+      navigator.__fridaySwVersionHook = true;
+    })();
+  </script>
   <title>Friday</title>
+  <style>
+    /* Friday: keep the existing visual language; only add the requested controls. */
+    .brand-mark,.status-dot { display:none !important; }
+    .chat-heading { min-width:0; flex:1; }
+    #active-chat-title { max-width:78vw; font-size:16px; font-weight:700; }
+    #chat-subtitle { display:block !important; margin-top:4px; color:#85948a; font-size:10px; line-height:1.25; font-variant-numeric:tabular-nums; }
+    .composer-expand { width:31px;height:34px;flex:0 0 31px;display:grid;place-items:center;border:0;border-radius:50%;background:#f0f5f0;color:#557467;padding:0; }
+    .composer-expand svg { width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round; }
+    .long-editor-backdrop,.history-picker-backdrop { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:0;background:rgba(13,29,19,.3);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px); }
+    .long-editor-sheet,.history-picker-sheet { width:min(100%,760px);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;border-radius:24px 24px 0 0;background:#fbfcf8;box-shadow:0 -12px 45px rgba(16,40,24,.16);padding:10px 16px calc(12px + env(safe-area-inset-bottom)); }
+    .long-editor-head,.history-picker-head { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 2px 12px; }
+    .long-editor-head h2,.history-picker-head h2 { margin:0;color:#26382d;font-size:16px;font-weight:720; }
+    .long-editor-tools { display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 10px;border-top:1px solid #edf1ec;border-bottom:1px solid #edf1ec; }
+    .long-editor-tools button { min-width:34px;height:30px;padding:0 9px;border:1px solid #e1e9e1;border-radius:9px;background:#fff;color:#52695b;font-size:11px;font-weight:650; }
+    .long-editor-tools button:active { background:#e8f5ec; }
+    #long-editor-text { flex:1;min-height:240px;width:100%;margin:10px 0;padding:13px;border:1px solid #e1e9e1;border-radius:14px;outline:none;resize:none;background:#fff;color:#23352a;font-size:15px;line-height:1.7; }
+    #long-editor-text:focus { border-color:#79b99a;box-shadow:0 0 0 3px rgba(70,162,115,.08); }
+    .long-editor-foot { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+    .long-editor-foot small { color:#9aa59c;font-size:10px; }
+    .long-editor-actions { display:flex;align-items:center;gap:8px; }
+    .history-search { width:100%;height:40px;padding:0 12px;border:1px solid #dfe7df;border-radius:11px;background:#fff;color:#26382d;font-size:13px;outline:none; }
+    .history-list { flex:1;min-height:140px;overflow:auto;margin:10px 0;display:flex;flex-direction:column;gap:7px; }
+    .history-entry { display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid #e8eee7;border-radius:12px;background:#fff; }
+    .history-entry input { margin-top:3px;accent-color:#16875f; }
+    .history-entry-content { min-width:0;flex:1; }
+    .history-entry-top { display:flex;justify-content:space-between;gap:8px;color:#809086;font-size:9px; }
+    .history-entry-text { margin-top:5px;color:#35483a;font-size:11px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap; }
+    .history-empty { padding:24px 10px;text-align:center;color:#9ba69d;font-size:11px; }
+    .token-trend-chart { margin:14px 0 8px;padding:13px 10px 9px;border:1px solid #e6ece5;border-radius:14px;background:#fff; }
+    .token-trend-title { display:flex;align-items:center;justify-content:space-between;gap:8px;color:#516458;font-size:11px;font-weight:700; }
+    .token-trend-legend { color:#94a198;font-size:9px;font-weight:400; }
+    .token-trend-bars { height:142px;display:flex;align-items:flex-end;gap:5px;margin-top:12px;padding:0 2px; }
+    .token-trend-day { min-width:0;flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px; }
+    .token-trend-value { color:#8d9a90;font-size:8px;line-height:1;white-space:nowrap; }
+    .token-trend-bar-wrap { width:100%;height:104px;display:flex;align-items:flex-end;justify-content:center; }
+    .token-trend-bar { width:min(16px,72%);min-height:2px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#48ad80,#16875f);box-shadow:0 2px 5px rgba(22,135,95,.12); }
+    .token-trend-label { color:#9aa59c;font-size:8px;white-space:nowrap; }
+    .token-trend-empty { margin:16px 0 4px;text-align:center;color:#9ba69d;font-size:10px; }
+    .token-stats-sheet { max-height:90dvh; }
+    @media (min-width:700px) {
+      .long-editor-backdrop,.history-picker-backdrop { align-items:center;padding:20px; }
+      .long-editor-sheet,.history-picker-sheet { border-radius:24px;max-height:88dvh;padding:14px 22px 18px; }
+      #long-editor-text { min-height:360px; }
+    }
+    @media (max-width:380px) {
+      .long-editor-sheet,.history-picker-sheet { padding-left:12px;padding-right:12px; }
+      .long-editor-tools { gap:4px; }
+      .long-editor-tools button { min-width:30px;padding:0 7px; }
+    }
+  </style>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
-      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
       <div class="chat-heading">
-        <div class="chat-title-line"><h1 id="active-chat-title">Friday</h1><span id="status-dot" class="status-dot"></span></div>
-        <div class="chat-subtitle" id="chat-subtitle"></div>
+        <div class="chat-title-line"><h1 id="active-chat-title">当前对话</h1><span id="status-dot" class="status-dot"></span></div>
+        <div class="chat-subtitle" id="chat-subtitle">0 字符 · 0 Tokens</div>
       </div>
     </header>
 
@@ -40,6 +104,9 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
         </button>
         <textarea id="message-input" rows="1" placeholder="输入消息……" enterkeyhint="send" aria-label="输入消息"></textarea>
+        <button type="button" id="expand-editor-button" class="composer-expand" aria-label="放大输入框" title="放大输入框">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4M4 8l6-6M20 8l-6-6M4 16l6 6M20 16l-6 6"/></svg>
+        </button>
         <button id="send-button" class="send-button" aria-label="发送消息" title="发送">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 19.5 15-7.5-15-7.5 2.1 6.2 8.2 1.3-8.2 1.3z"/></svg>
         </button>
@@ -97,10 +164,8 @@
         <label class="field-label" for="memory-editor">当前子对话的偏好记忆</label>
         <textarea id="memory-editor" rows="4" placeholder="添加偏好记忆"></textarea>
         <div class="settings-actions"><button class="secondary-button close-settings">取消</button><button class="primary-button" id="save-settings">保存设置</button></div>
-        
       </section>
     </div>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
   <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -109,5 +174,299 @@
   <script defer src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
   <script defer src="enhancements.js"></script>
   <script defer src="app.js"></script>
+
+  <script>
+  /* Friday UI additions. Uses the same IndexedDB database; does not clear or migrate chat history. */
+  (() => {
+    'use strict';
+    const DB_NAME = 'sidechat-local-db';
+    const byId = id => document.getElementById(id);
+    const safe = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    let dbPromise = null, activeChatId = null, statsBusy = false, lastStatsKey = '';
+    const num = value => Number(value || 0).toLocaleString('en-US');
+    function installUsageCapture() {
+      if (window.__fridayUsageCaptureInstalled) return;
+      window.__fridayUsageCaptureInstalled = true;
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        let isCompletion = false, model = 'unknown';
+        try {
+          const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+          isCompletion = url.pathname.endsWith('/chat/completions');
+          if (typeof init?.body === 'string') model = JSON.parse(init.body).model || model;
+        } catch (_) {}
+        const row = document.querySelector('#chat-list .chat-list-item.active');
+        const chatId = row?.dataset.chatId || activeChatId || 'unknown';
+        const response = await originalFetch(input, init);
+        if (isCompletion && response.ok) {
+          try {
+            const data = await response.clone().json();
+            if (data?.usage) await appendTrendUsage(chatId, model, data.usage);
+          } catch (error) { console.warn('Friday Token trend capture skipped:', error); }
+        }
+        return response;
+      };
+    }
+    async function appendTrendUsage(chatId, model, usage) {
+      const db = await openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('settings', 'readwrite');
+        const settings = tx.objectStore('settings');
+        const request = settings.get('token-trend-history');
+        request.onsuccess = () => {
+          const entries = Array.isArray(request.result?.value) ? request.result.value : [];
+          entries.push({ timestamp:new Date().toISOString(), chatId, model, prompt_tokens:Number(usage.prompt_tokens||0), completion_tokens:Number(usage.completion_tokens||0), reasoning_tokens:Number(usage.completion_tokens_details?.reasoning_tokens||usage.reasoning_tokens||0), total_tokens:Number(usage.total_tokens||0) });
+          settings.put({ key:'token-trend-history', value:entries.slice(-5000) });
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+      });
+    }
+    installUsageCapture();
+    function openDb() {
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return dbPromise;
+    }
+    function readStores(names) {
+      return openDb().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(names, 'readonly'), values = {};
+        names.forEach(name => {
+          const req = tx.objectStore(name).getAll();
+          req.onsuccess = () => { values[name] = req.result || []; };
+          req.onerror = () => reject(req.error);
+        });
+        tx.oncomplete = () => resolve(values);
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+    function setHeaderText(chats, messages, settings) {
+      const activeRow = document.querySelector('#chat-list .chat-list-item.active');
+      const id = activeRow?.dataset.chatId || activeChatId;
+      if (!id) return;
+      activeChatId = id;
+      const chat = chats.find(x => x.id === id);
+      const rawName = String(chat?.name || '').trim();
+      const unnamed = !rawName || ['新对话','未命名','当前对话','new chat','untitled'].includes(rawName.toLowerCase());
+      const title = unnamed ? '当前对话' : rawName;
+      const titleNode = byId('active-chat-title');
+      if (titleNode && titleNode.textContent !== title) titleNode.textContent = title;
+      const current = messages.filter(m => m.chatId === id);
+      const chars = current.reduce((sum, m) => sum + Array.from(String(m.content || '')).length, 0);
+      const usageStats = settings.find(x => x.key === 'token-usage')?.value;
+      const tokens = Number(usageStats?.chats?.[id]?.total_tokens ?? current.reduce((sum, m) => sum + (m.role === 'assistant' ? Number(m.usage?.total_tokens || 0) : 0), 0));
+      const line = byId('chat-subtitle');
+      const display = `${num(chars)} 字符 · ${num(tokens)} Tokens`;
+      if (line && line.textContent !== display) line.textContent = display;
+    }
+    async function refreshHeader() {
+      if (statsBusy) return;
+      statsBusy = true;
+      try {
+        const data = await readStores(['chats','messages','settings']);
+        setHeaderText(data.chats, data.messages, data.settings);
+      } catch (error) { console.warn('Friday header stats unavailable:', error); }
+      finally { statsBusy = false; }
+    }
+    function installHeaderObserver() {
+      refreshHeader();
+      const observer = new MutationObserver(() => refreshHeader());
+      const list = byId('chat-list'), messageArea = byId('messages'), titleNode = byId('active-chat-title');
+      if (list) observer.observe(list, { childList:true, subtree:true, attributes:true, attributeFilter:['class'] });
+      if (messageArea) observer.observe(messageArea, { childList:true, subtree:true, characterData:true });
+      if (titleNode) observer.observe(titleNode, { childList:true, characterData:true, subtree:true });
+      setInterval(refreshHeader, 1800);
+    }
+
+    function ensureOverlayStyles() {
+      const style = document.createElement('style');
+      style.textContent = `
+        .friday-action { height:36px;min-width:36px;border:1px solid #e1e9e1;border-radius:10px;background:#fff;color:#527261;font-size:11px;font-weight:650;padding:0 10px; }
+        .friday-action.primary {border:0;background:#16875f;color:#fff;}
+        .friday-action:active {filter:brightness(.97);}
+        .long-editor-actions .friday-action {height:39px;min-width:76px;border-radius:11px;}
+        .history-counter {color:#88978d;font-size:10px;align-self:center;}
+      `;
+      document.head.appendChild(style);
+    }
+    function makeModal(className, sheetClass, title, closeLabel='关闭') {
+      const overlay = document.createElement('div'); overlay.className = className;
+      const sheet = document.createElement('section'); sheet.className = sheetClass; sheet.setAttribute('role','dialog'); sheet.setAttribute('aria-modal','true');
+      const head = document.createElement('div'); head.className = className.includes('history') ? 'history-picker-head' : 'long-editor-head';
+      const h2 = document.createElement('h2'); h2.textContent = title;
+      const close = document.createElement('button'); close.className = 'plain-icon'; close.type='button'; close.textContent='×'; close.setAttribute('aria-label',closeLabel);
+      head.append(h2,close); sheet.append(head); overlay.append(sheet);
+      close.addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+      document.body.append(overlay);
+      return {overlay,sheet,close};
+    }
+    function insertFormat(textarea, before, after='', fallback='') {
+      const start=textarea.selectionStart, end=textarea.selectionEnd;
+      const selected=textarea.value.slice(start,end) || fallback;
+      const insertion=before+selected+after;
+      textarea.setRangeText(insertion,start,end,'select');
+      textarea.focus();
+      const offset=start+before.length;
+      textarea.setSelectionRange(offset,offset+selected.length);
+    }
+    async function openHistoryPicker(editor) {
+      const modal=makeModal('history-picker-backdrop','history-picker-sheet','引用历史对话');
+      const search=document.createElement('input'); search.className='history-search'; search.type='search'; search.placeholder='搜索历史消息或子对话名称';
+      const list=document.createElement('div'); list.className='history-list';
+      const foot=document.createElement('div'); foot.className='long-editor-foot';
+      const counter=document.createElement('small'); counter.className='history-counter'; counter.textContent='已选择 0 条';
+      const actions=document.createElement('div'); actions.className='long-editor-actions';
+      const cancel=document.createElement('button'); cancel.className='friday-action'; cancel.textContent='取消';
+      const confirm=document.createElement('button'); confirm.className='friday-action primary'; confirm.textContent='插入引用';
+      actions.append(cancel,confirm); foot.append(counter,actions);
+      modal.sheet.append(search,list,foot);
+      cancel.addEventListener('click',()=>modal.overlay.remove());
+      let rows=[]; const selected=new Set();
+      try {
+        const data=await readStores(['chats','messages']);
+        const chatMap=new Map(data.chats.map(c=>[c.id,c]));
+        rows=data.messages.filter(m=>m.content && (m.role==='user'||m.role==='assistant')).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(m=>({message:m,chat:chatMap.get(m.chatId)}));
+      } catch(error) { list.innerHTML='<div class="history-empty">无法读取本地历史记录</div>'; return; }
+      const updateCounter=()=>counter.textContent=`已选择 ${selected.size} 条`;
+      function renderRows() {
+        const q=search.value.trim().toLowerCase();
+        const matched=rows.filter(x=>!q || `${x.chat?.name||'当前对话'} ${x.message.content}`.toLowerCase().includes(q));
+        list.innerHTML='';
+        if(!matched.length){list.innerHTML='<div class="history-empty">没有找到匹配的历史消息</div>';return;}
+        const frag=document.createDocumentFragment();
+        matched.forEach(({message,chat})=>{
+          const label=document.createElement('label'); label.className='history-entry';
+          const check=document.createElement('input'); check.type='checkbox'; check.checked=selected.has(message.id);
+          check.addEventListener('change',()=>{check.checked?selected.add(message.id):selected.delete(message.id);updateCounter();});
+          const content=document.createElement('div'); content.className='history-entry-content';
+          const meta=document.createElement('div'); meta.className='history-entry-top';
+          const left=document.createElement('span'); left.textContent=`${chat?.name||'当前对话'} · ${message.role==='user'?'用户':'Friday'}`;
+          const right=document.createElement('span'); right.textContent=message.createdAt?new Date(message.createdAt).toLocaleString() : '';
+          meta.append(left,right);
+          const excerpt=document.createElement('div'); excerpt.className='history-entry-text';
+          const text=String(message.content||''); excerpt.textContent=text.length>320?`${text.slice(0,320)}…`:text;
+          content.append(meta,excerpt); label.append(check,content); frag.append(label);
+        });
+        list.append(frag);
+      }
+      search.addEventListener('input',renderRows); renderRows();
+      confirm.addEventListener('click',()=>{
+        const selectedRows=rows.filter(x=>selected.has(x.message.id));
+        if(!selectedRows.length){modal.overlay.remove();return;}
+        const block='\n\n【引用的历史对话】\n'+selectedRows.reverse().map(({message,chat})=>{
+          const when=message.createdAt?new Date(message.createdAt).toLocaleString():'';
+          return `【${chat?.name||'当前对话'}｜${message.role==='user'?'用户':'Friday'}｜${when}】\n${message.content}`;
+        }).join('\n\n')+'\n【历史引用结束】\n';
+        const start=editor.selectionStart,end=editor.selectionEnd;
+        editor.setRangeText(block,start,end,'end'); editor.focus();
+        modal.overlay.remove();
+      });
+    }
+    function openLongEditor() {
+      const mainInput=byId('message-input');
+      const modal=makeModal('long-editor-backdrop','long-editor-sheet','编辑长文本');
+      const toolbar=document.createElement('div'); toolbar.className='long-editor-tools';
+      const editor=document.createElement('textarea'); editor.id='long-editor-text'; editor.setAttribute('aria-label','长文本输入'); editor.placeholder='在这里输入长文本。按回车换行，使用右下角发送按钮发送。'; editor.value=mainInput.value;
+      const controls=[
+        ['B','**','**','粗体'],['I','*','*','斜体'],['H1','\n# ','\n','一级标题'],['H2','\n## ','\n','二级标题'],
+        ['• 列表','\n- ','','无序列表'],['1. 列表','\n1. ','','有序列表'],['引用','\n> ','','引用段落'],['代码','\n```\n','\n```\n','代码块'],['分隔线','\n\n---\n\n','','分隔线']
+      ];
+      controls.forEach(([label,before,after,title])=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.addEventListener('click',()=>insertFormat(editor,before,after,'文字'));toolbar.append(b);});
+      const ref=document.createElement('button');ref.type='button';ref.textContent='引用历史';ref.title='从历史对话中选择内容';ref.addEventListener('click',()=>openHistoryPicker(editor));toolbar.append(ref);
+      const foot=document.createElement('div');foot.className='long-editor-foot';
+      const hint=document.createElement('small');hint.textContent='回车换行 · 点击发送按钮发送';
+      const actions=document.createElement('div');actions.className='long-editor-actions';
+      const cancel=document.createElement('button');cancel.type='button';cancel.className='friday-action';cancel.textContent='取消';
+      const send=document.createElement('button');send.type='button';send.className='friday-action primary';send.textContent='发送';
+      cancel.addEventListener('click',()=>modal.overlay.remove());
+      send.addEventListener('click',()=>{
+        mainInput.value=editor.value;
+        mainInput.dispatchEvent(new Event('input',{bubbles:true}));
+        modal.overlay.remove();
+        byId('send-button').click();
+      });
+      actions.append(cancel,send);foot.append(hint,actions);
+      modal.sheet.append(toolbar,editor,foot);
+      setTimeout(()=>{editor.focus();editor.setSelectionRange(editor.value.length,editor.value.length);},60);
+    }
+
+    async function showTokenTrend() {
+      const data=await readStores(['chats','messages','settings']);
+      const allMessages=data.messages||[];
+      const trendRow=(data.settings||[]).find(x=>x.key==='token-trend-history');
+      const usageLog=Array.isArray(trendRow?.value)?trendRow.value:[];
+      const firstLoggedAt=usageLog.length?Math.min(...usageLog.map(x=>new Date(x.timestamp||0).getTime()).filter(Number.isFinite)):Infinity;
+      const legacy=allMessages.filter(m=>m.role==='assistant'&&m.usage&&new Date(m.createdAt||0).getTime()<firstLoggedAt).map(m=>({timestamp:m.createdAt,chatId:m.chatId,prompt_tokens:Number(m.usage.prompt_tokens||0),completion_tokens:Number(m.usage.completion_tokens||0),reasoning_tokens:Number(m.usage.completion_tokens_details?.reasoning_tokens||m.usage.reasoning_tokens||0),total_tokens:Number(m.usage.total_tokens||0)}));
+      const entries=[...legacy,...usageLog];
+      const usageTotals=(data.settings||[]).find(x=>x.key==='token-usage')?.value?.total;
+      const totals=entries.reduce((s,m)=>{
+        s.prompt+=Number(m.prompt_tokens||0);
+        s.completion+=Number(m.completion_tokens||0);
+        s.reasoning+=Number(m.reasoning_tokens||0);
+        s.total+=Number(m.total_tokens||0);
+        s.calls+=1; return s;
+      },{prompt:0,completion:0,reasoning:0,total:0,calls:0});
+      if (usageTotals) {
+        totals.prompt=Number(usageTotals.prompt_tokens||totals.prompt);
+        totals.completion=Number(usageTotals.completion_tokens||totals.completion);
+        totals.reasoning=Number(usageTotals.reasoning_tokens||totals.reasoning);
+        totals.total=Number(usageTotals.total_tokens||totals.total);
+        totals.calls=Number(usageTotals.calls||totals.calls);
+      }
+      const daily=new Map();
+      entries.forEach(m=>{
+        const d=new Date(m.timestamp||Date.now()); const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const u=daily.get(key)||0; daily.set(key,u+Number(m.total_tokens||0));
+      });
+      const days=[]; const today=new Date();
+      for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(today.getDate()-i);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;days.push({key,label:`${d.getMonth()+1}/${d.getDate()}`,value:daily.get(key)||0});}
+      const max=Math.max(1,...days.map(x=>x.value));
+      const bars=days.map(d=>`<div class="token-trend-day"><span class="token-trend-value">${d.value?num(d.value):''}</span><div class="token-trend-bar-wrap"><div class="token-trend-bar" style="height:${Math.max(d.value?4:2,d.value/max*100)}%" title="${d.key}: ${num(d.value)} Tokens"></div></div><span class="token-trend-label">${d.label}</span></div>`).join('');
+      const modal=makeModal('history-picker-backdrop','history-picker-sheet','Token 使用趋势');
+      modal.sheet.classList.add('token-stats-sheet');
+      const grid=document.createElement('div');grid.className='token-stat-grid';
+      grid.innerHTML=`<div class="token-stat-card"><small>累计 Token</small><b>${num(totals.total)}</b><span>所有子对话</span></div><div class="token-stat-card"><small>API 调用</small><b>${num(totals.calls)}</b><span>有 usage 记录的回答</span></div><div class="token-stat-card"><small>输入 Token</small><b>${num(totals.prompt)}</b><span>Prompt</span></div><div class="token-stat-card"><small>输出 Token</small><b>${num(totals.completion)}</b><span>Completion</span></div>`;
+      const trend=document.createElement('div');trend.className='token-trend-chart';
+      trend.innerHTML=`<div class="token-trend-title"><span>最近 14 天</span><span class="token-trend-legend">每日 Token 消耗</span></div><div class="token-trend-bars">${bars}</div>${totals.total? '':'<div class="token-trend-empty">目前还没有可绘制的 Token 使用记录</div>'}`;
+      const detail=document.createElement('div');detail.className='token-detail-row';detail.innerHTML=`<span>思考 Token</span><b>${num(totals.reasoning)}</b>`;
+      const chatHead=document.createElement('h3');chatHead.className='token-chat-heading';chatHead.textContent='子对话用量';
+      const perChat=new Map();
+      entries.forEach(m=>perChat.set(m.chatId,(perChat.get(m.chatId)||0)+Number(m.total_tokens||0)));
+      const chats=document.createElement('div');chats.className='token-chat-usage';
+      const ranked=[...perChat.entries()].map(([id,value])=>({chat:data.chats.find(c=>c.id===id),value})).filter(x=>x.chat).sort((a,b)=>b.value-a.value);
+      chats.innerHTML=ranked.length?ranked.map(x=>`<div class="token-chat-row"><span>${safe(x.chat.name||'当前对话')}</span><b>${num(x.value)}</b></div>`).join(''):'<p class="token-empty">暂无 Token 记录</p>';
+      const foot=document.createElement('div');foot.className='long-editor-foot';foot.style.marginTop='14px';
+      const source=document.createElement('small');source.textContent='统计依据：本机保存的 API usage 返回记录；升级前的回答用量会尽量回填';
+      const close=document.createElement('button');close.className='friday-action primary';close.textContent='完成';close.addEventListener('click',()=>modal.overlay.remove());
+      foot.append(source,close);modal.sheet.append(grid,trend,detail,chatHead,chats,foot);
+    }
+
+    function installControls() {
+      if (window.__fridayExtraUiInstalled) return true;
+      if (!document.querySelector('#chat-list .chat-list-item') || !byId('messages')?.children.length) return false;
+      window.__fridayExtraUiInstalled=true;
+      ensureOverlayStyles();
+      const expand=byId('expand-editor-button');
+      if(expand) expand.addEventListener('click',openLongEditor);
+      document.addEventListener('click',event=>{
+        if(event.target.closest('#token-stats')){
+          event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+          showTokenTrend().catch(err=>console.error('Friday Token trend:',err));
+        }
+      },true);
+      installHeaderObserver();
+      return true;
+    }
+    const timer=setInterval(()=>{if(installControls())clearInterval(timer);},180);
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installControls,{once:true});
+    else installControls();
+    window.addEventListener('pageshow',()=>setTimeout(installControls,200));
+  })();
+  </script>
 </body>
 </html>
