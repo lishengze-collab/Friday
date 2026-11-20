@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120c');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120d');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -28,193 +28,7 @@
     })();
   </script>
   <title>Friday</title>
-  <style>
-    /* Friday: keep the existing visual language; only add the requested controls. */
-    .brand-mark,.status-dot { display:none !important; }
-    .chat-heading { min-width:0; flex:1; }
-    #active-chat-title { max-width:78vw; font-size:16px; font-weight:700; }
-    #chat-subtitle { display:block !important; margin-top:4px; color:#85948a; font-size:10px; line-height:1.25; font-variant-numeric:tabular-nums; }
-    .composer-expand { width:31px;height:34px;flex:0 0 31px;display:grid;place-items:center;border:0;border-radius:50%;background:#f0f5f0;color:#557467;padding:0; }
-    .composer-expand svg { width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round; }
-    .long-editor-backdrop,.history-picker-backdrop { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:0;background:rgba(13,29,19,.3);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px); }
-    .long-editor-sheet,.history-picker-sheet { width:min(100%,760px);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;border-radius:24px 24px 0 0;background:#fbfcf8;box-shadow:0 -12px 45px rgba(16,40,24,.16);padding:10px 16px calc(12px + env(safe-area-inset-bottom)); }
-    .long-editor-head,.history-picker-head { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 2px 12px; }
-    .long-editor-head h2,.history-picker-head h2 { margin:0;color:#26382d;font-size:16px;font-weight:720; }
-    .long-editor-tools { display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 10px;border-top:1px solid #edf1ec;border-bottom:1px solid #edf1ec; }
-    .long-editor-tools button { min-width:34px;height:30px;padding:0 9px;border:1px solid #e1e9e1;border-radius:9px;background:#fff;color:#52695b;font-size:11px;font-weight:650; }
-    .long-editor-tools button:active { background:#e8f5ec; }
-    #long-editor-text { flex:1;min-height:240px;width:100%;margin:10px 0;padding:13px;border:1px solid #e1e9e1;border-radius:14px;outline:none;resize:none;background:#fff;color:#23352a;font-size:15px;line-height:1.7; }
-    #long-editor-text:focus { border-color:#79b99a;box-shadow:0 0 0 3px rgba(70,162,115,.08); }
-    .long-editor-foot { display:flex;align-items:center;justify-content:space-between;gap:8px; }
-    .long-editor-foot small { color:#9aa59c;font-size:10px; }
-    .long-editor-actions { display:flex;align-items:center;gap:8px; }
-    .history-search { width:100%;height:40px;padding:0 12px;border:1px solid #dfe7df;border-radius:11px;background:#fff;color:#26382d;font-size:13px;outline:none; }
-    .history-list { flex:1;min-height:140px;overflow:auto;margin:10px 0;display:flex;flex-direction:column;gap:7px; }
-    .history-entry { display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid #e8eee7;border-radius:12px;background:#fff; }
-    .history-entry input { margin-top:3px;accent-color:#16875f; }
-    .history-entry-content { min-width:0;flex:1; }
-    .history-entry-top { display:flex;justify-content:space-between;gap:8px;color:#809086;font-size:9px; }
-    .history-entry-text { margin-top:5px;color:#35483a;font-size:11px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap; }
-    .history-empty { padding:24px 10px;text-align:center;color:#9ba69d;font-size:11px; }
-    .token-trend-chart { margin:14px 0 8px;padding:13px 10px 9px;border:1px solid #e6ece5;border-radius:14px;background:#fff; }
-    .token-trend-title { display:flex;align-items:center;justify-content:space-between;gap:8px;color:#516458;font-size:11px;font-weight:700; }
-    .token-trend-legend { color:#94a198;font-size:9px;font-weight:400; }
-    .token-trend-bars { height:142px;display:flex;align-items:flex-end;gap:5px;margin-top:12px;padding:0 2px; }
-    .token-trend-day { min-width:0;flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px; }
-    .token-trend-value { color:#8d9a90;font-size:8px;line-height:1;white-space:nowrap; }
-    .token-trend-bar-wrap { width:100%;height:104px;display:flex;align-items:flex-end;justify-content:center; }
-    .token-trend-bar { width:min(16px,72%);min-height:2px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#48ad80,#16875f);box-shadow:0 2px 5px rgba(22,135,95,.12); }
-    .token-trend-label { color:#9aa59c;font-size:8px;white-space:nowrap; }
-    .token-trend-empty { margin:16px 0 4px;text-align:center;color:#9ba69d;font-size:10px; }
-    .token-stats-sheet { max-height:90dvh; }
-    @media (min-width:700px) {
-      .long-editor-backdrop,.history-picker-backdrop { align-items:center;padding:20px; }
-      .long-editor-sheet,.history-picker-sheet { border-radius:24px;max-height:88dvh;padding:14px 22px 18px; }
-      #long-editor-text { min-height:360px; }
-    }
-    @media (max-width:380px) {
-      .long-editor-sheet,.history-picker-sheet { padding-left:12px;padding-right:12px; }
-      .long-editor-tools { gap:4px; }
-      .long-editor-tools button { min-width:30px;padding:0 7px; }
-    }
-  </style>
-
-  <style id="friday-wa-theme">
-    /* ===== Friday · WhatsApp 风格美化（仅视觉与交互，不改业务逻辑） ===== */
-    :root {
-      --wa-green:#008069; --wa-green-dark:#006b58; --wa-accent:#25d366;
-      --wa-out:#d9fdd3; --wa-in:#ffffff; --wa-bg:#efeae2; --wa-text:#111b21; --wa-sub:#667781;
-    }
-    html,body { background:var(--wa-bg); }
-    #app { background:var(--wa-bg); }
-
-    /* 顶栏：WhatsApp 绿 */
-    #app .topbar { background:var(--wa-green) !important; color:#fff; border-bottom:0 !important; box-shadow:0 1px 3px rgba(0,0,0,.18); padding-top:calc(8px + env(safe-area-inset-top)); }
-    #app .topbar #active-chat-title { color:#fff !important; letter-spacing:.2px; }
-    #app #chat-subtitle { color:rgba(255,255,255,.74) !important; }
-
-    /* 聊天区：米色壁纸 + 淡淡点阵 */
-    #app .chat-scroll { background-color:var(--wa-bg);
-      background-image:radial-gradient(rgba(11,20,26,.045) 1px,transparent 1.2px);
-      background-size:18px 18px; scroll-behavior:smooth; }
-    #app .date-divider { text-align:center; }
-    #app .date-divider span { display:inline-block; padding:5px 12px; border-radius:8px; background:#fff; color:var(--wa-sub); font-size:11.5px; box-shadow:0 1px 1px rgba(11,20,26,.12); }
-
-    /* 气泡：绿色发出、白色收到，带小尾巴 */
-    #app #messages [class*="bubble"] { position:relative; color:var(--wa-text); box-shadow:0 1px 1px rgba(11,20,26,.14) !important; border:0 !important; border-radius:8px !important; background:var(--wa-in); animation:wa-pop .22s ease-out both; }
-    #app #messages [class*="user"] [class*="bubble"],
-    #app #messages [class*="bubble"][class*="user"] { background:var(--wa-out) !important; border-top-right-radius:2px !important; color:var(--wa-text) !important; }
-    #app #messages [class*="assistant"] [class*="bubble"],
-    #app #messages [class*="bubble"][class*="assistant"] { background:var(--wa-in) !important; border-top-left-radius:2px !important; }
-    @keyframes wa-pop { from { opacity:0; transform:translateY(6px) scale(.985); } to { opacity:1; transform:none; } }
-    #app #messages a { color:#027eb5; }
-    #app #messages pre { border-radius:8px; }
-
-    /* 输入栏：圆角白色胶囊 + 绿色发送键 */
-    #app .composer-wrap { background:transparent !important; border-top:0 !important; box-shadow:none !important; }
-    #app .composer { background:#fff !important; border:0 !important; border-radius:26px !important; box-shadow:0 1px 3px rgba(11,20,26,.16) !important; }
-    #app .composer textarea { color:var(--wa-text); }
-    #app .composer-action,#app .composer-expand { background:transparent !important; color:var(--wa-sub) !important; }
-    #app .composer-action:active,#app .composer-expand:active { background:#f0f2f5 !important; }
-    #app .send-button { background:var(--wa-green) !important; color:#fff !important; border:0 !important; box-shadow:0 2px 6px rgba(0,128,105,.35) !important; transition:transform .12s ease, background .15s; }
-    #app .send-button svg { fill:#fff; stroke:#fff; }
-    #app .send-button:active { transform:scale(.92); background:var(--wa-green-dark) !important; }
-    #app .typing-bubble { background:#fff !important; box-shadow:0 1px 1px rgba(11,20,26,.14); }
-
-    /* 通用交互细节 */
-    #app button:not(.chat-list-item):not(.float-orb) { transition:transform .12s ease, background .15s ease, opacity .15s ease; }
-    #app button:not(.chat-list-item):not(.float-orb):active { transform:scale(.95); }
-    #app .primary-button,#app .panel-primary { background:var(--wa-green) !important; color:#fff !important; border:0; }
-    #app .float-panel { background:#fff !important; border:0 !important; border-radius:16px !important; box-shadow:0 8px 28px rgba(11,20,26,.22) !important; animation:wa-pop .18s ease-out both; }
-    #app .menu-item:active,#app .chat-list-item:active { background:#f0f2f5 !important; }
-    #app .chat-list-item.active:not(.swiping-left):not(.swiping-right):not(.swipe-handled) { background:#e7f8ee; }
-    #app .settings-sheet { border-radius:20px 20px 0 0; }
-    #app .toast { background:rgba(17,27,33,.92) !important; color:#fff; border-radius:20px; }
-    ::selection { background:rgba(37,211,102,.28); }
-
-    /* ===== 悬浮窗：收起到屏幕左/右边缘，点击/滑动屏幕边缘唤出 ===== */
-    #app .float-panel[hidden],#app [hidden] { display:none !important; }
-    /* 不改动悬浮球原有位置/拖动逻辑，只用独立的 translate 属性把它们推到最近的屏幕边缘 */
-    #app .float-orb { background:var(--wa-green) !important; color:#fff !important; border:0 !important;
-      box-shadow:0 3px 10px rgba(0,0,0,.26) !important;
-      transition:translate .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
-    #app .float-orb svg { stroke:#fff; }
-    #app .float-orb .orb-label { color:#fff; }
-    body:not(.orbs-open) #app .float-orb { translate:var(--hide-x,140px) 0; opacity:0; pointer-events:none; }
-    body.orbs-open #app .float-orb { translate:0 0; opacity:1; pointer-events:auto; }
-    #app .float-orb.measuring { translate:0 0 !important; transition:none !important; }
-
-    .edge-zone { position:fixed; top:84px; bottom:calc(84px + env(safe-area-inset-bottom)); width:16px; z-index:8; background:transparent; touch-action:pan-y; }
-    .edge-zone.left { left:0; } .edge-zone.right { right:0; }
-    .edge-zone::after { content:""; position:absolute; top:50%; width:4px; height:44px; margin-top:-22px; border-radius:4px; background:rgba(0,128,105,.38); transition:opacity .2s; }
-    .edge-zone.left::after { left:2px; } .edge-zone.right::after { right:2px; }
-    body.orbs-open .edge-zone { pointer-events:none; }
-    body.orbs-open .edge-zone::after { opacity:0; }
-
-    /* ===== 联网搜索链接折叠 ===== */
-    details.src-fold { margin:10px 0 4px; border:1px solid #e1e8e3; border-radius:10px; background:#f7f9f6; overflow:hidden; }
-    details.src-fold > summary { list-style:none; cursor:pointer; padding:8px 12px; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--wa-green); font-weight:600; user-select:none; -webkit-user-select:none; }
-    details.src-fold > summary::-webkit-details-marker { display:none; }
-    details.src-fold > summary::after { content:"›"; margin-left:auto; font-size:16px; line-height:1; color:var(--wa-sub); transition:transform .2s; }
-    details.src-fold[open] > summary::after { transform:rotate(90deg); }
-    details.src-fold > .src-fold-body { padding:2px 12px 10px; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
-    details.src-fold > .src-fold-body ul,details.src-fold > .src-fold-body ol { margin:4px 0; padding-left:18px; }
-    details.src-fold > .src-fold-body p { margin:3px 0; }
-
-    /* 导出 PDF（window.print）时：去掉装饰，保持原有打印样式 */
-    @media print {
-      .edge-zone { display:none !important; }
-      #app .chat-scroll { background:#fff !important; }
-      #app #messages [class*="bubble"] { background:#fff !important; border:1px solid #ddd !important; box-shadow:none !important; animation:none !important; }
-      details.src-fold > .src-fold-body { display:block; }
-    }
-  </style>
-
-  <style id="friday-native-keyboard-fix">
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden !important;
-      overscroll-behavior: none !important;
-    }
-
-    body {
-      min-height: 0;
-    }
-
-    /* Anchor the app to the visible viewport, including iOS keyboard panning. */
-    #app {
-      position: fixed !important;
-      top: var(--friday-visual-top, 0px) !important;
-      right: 0 !important;
-      bottom: auto !important;
-      left: 0 !important;
-      width: 100%;
-      height: var(--friday-viewport-height, 100dvh) !important;
-      min-height: 0 !important;
-      overflow: hidden !important;
-    }
-  </style>
-
-  <style id="friday-composer-gesture-lock">
-    /* Lock only the composer chrome; preserve text editing inside the textarea. */
-    #composer-wrap {
-      -webkit-user-select: none;
-      user-select: none;
-      overscroll-behavior: contain;
-    }
-    #composer-wrap textarea,
-    #composer-wrap input,
-    #composer-wrap [contenteditable="true"] {
-      -webkit-user-select: text;
-      user-select: text;
-      overscroll-behavior: contain;
-    }
-  </style>
-
-</head>
+  </head>
 <body>
   <div id="app">
     <header class="topbar">
@@ -241,7 +55,7 @@
         </button>
         <textarea id="message-input" rows="1" placeholder="输入消息……" enterkeyhint="send" aria-label="输入消息"></textarea>
         <button type="button" id="expand-editor-button" class="composer-expand" aria-label="放大输入框" title="放大输入框">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4M4 8l6-6M20 8l-6-6M4 16l6 6M20 16l-6 6"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg>
         </button>
         <button id="send-button" class="send-button" aria-label="发送消息" title="发送">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 19.5 15-7.5-15-7.5 2.1 6.2 8.2 1.3-8.2 1.3z"/></svg>
@@ -784,93 +598,64 @@
   })();
   </script>
 
-  <script id="friday-native-keyboard-fix-script">
+  
+  <script id="friday-viewport-shell">
   (() => {
     'use strict';
 
-    if (window.__fridayNativeKeyboardFixV3) return;
-    window.__fridayNativeKeyboardFixV3 = true;
+    if (window.__fridayViewportShellV4) return;
+    window.__fridayViewportShellV4 = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
-    let rafId = 0;
-    let appliedTop = -1;
-    let appliedHeight = -1;
+    let frame = 0;
+    let lastTop = -1;
+    let lastHeight = -1;
 
-    // Keep the app aligned with BOTH visualViewport.offsetTop and height.
-    // On iOS, the browser may pan the visual viewport when an input receives focus.
-    function updateViewport() {
-      if (rafId) return;
+    function syncViewport() {
+      if (frame) return;
 
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
 
+        // The visual viewport becomes shorter when the iOS keyboard opens.
+        // offsetTop also follows Safari's automatic viewport pan around focused inputs.
         let top = 0;
-        let height = window.innerHeight || root.clientHeight || 0;
+        let height = window.innerHeight || root.clientHeight || 1;
 
-        if (viewport && Math.abs((viewport.scale || 1) - 1) < 0.02) {
+        if (viewport && viewport.scale >= 0.98 && viewport.scale <= 1.02) {
           top = viewport.offsetTop || 0;
           height = viewport.height || height;
         }
 
-        const nextTop = Math.max(0, Math.round(top));
-        const nextHeight = Math.max(1, Math.round(height));
+        top = Math.max(0, Math.round(top));
+        height = Math.max(1, Math.round(height));
 
-        // Avoid needless style writes and layout recalculations.
-        if (nextTop !== appliedTop) {
-          root.style.setProperty('--friday-visual-top', nextTop + 'px');
-          appliedTop = nextTop;
+        // Only write changed values: this avoids unnecessary flex/layout recalculations.
+        if (top !== lastTop) {
+          root.style.setProperty('--friday-vv-top', top + 'px');
+          lastTop = top;
         }
 
-        if (nextHeight !== appliedHeight) {
-          root.style.setProperty('--friday-viewport-height', nextHeight + 'px');
-          appliedHeight = nextHeight;
+        if (height !== lastHeight) {
+          root.style.setProperty('--friday-vv-height', height + 'px');
+          lastHeight = height;
         }
       });
     }
 
     if (viewport) {
-      viewport.addEventListener('resize', updateViewport, { passive: true });
-      viewport.addEventListener('scroll', updateViewport, { passive: true });
+      viewport.addEventListener('resize', syncViewport, { passive: true });
+      viewport.addEventListener('scroll', syncViewport, { passive: true });
     }
 
-    window.addEventListener('resize', updateViewport, { passive: true });
-    window.addEventListener('orientationchange', updateViewport, { passive: true });
-    window.addEventListener('pageshow', updateViewport);
-    document.addEventListener('focusin', updateViewport, true);
-    document.addEventListener('focusout', updateViewport, true);
+    window.addEventListener('resize', syncViewport, { passive: true });
+    window.addEventListener('orientationchange', syncViewport, { passive: true });
+    window.addEventListener('pageshow', syncViewport);
+    document.addEventListener('focusin', syncViewport, true);
+    document.addEventListener('focusout', syncViewport, true);
 
-    updateViewport();
-  })();
-  </script>
-
-  <script id="friday-composer-gesture-lock-script">
-  (() => {
-    'use strict';
-
-    const wrap = document.getElementById('composer-wrap');
-    if (!wrap || wrap.dataset.verticalGestureLock === 'true') return;
-    wrap.dataset.verticalGestureLock = 'true';
-
-    let blockVerticalPan = false;
-
-    // Allow normal interactions on the actual controls. Only the surrounding
-    // composer surface is prevented from initiating a page-level vertical pan.
-    wrap.addEventListener('touchstart', event => {
-      blockVerticalPan = !event.target.closest(
-        'textarea, input, button, select, a, [contenteditable="true"]'
-      );
-    }, { passive: true });
-
-    wrap.addEventListener('touchmove', event => {
-      if (blockVerticalPan) event.preventDefault();
-    }, { passive: false });
-
-    const clearGesture = () => {
-      blockVerticalPan = false;
-    };
-    wrap.addEventListener('touchend', clearGesture, { passive: true });
-    wrap.addEventListener('touchcancel', clearGesture, { passive: true });
+    syncViewport();
   })();
   </script>
 
