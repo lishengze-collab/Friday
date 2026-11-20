@@ -18,8 +18,7 @@
   --bubble-font: 15px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --friday-vv-top: 0px;
-  --friday-vv-height: 100dvh;
+  --friday-app-height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   background: var(--wa-paper);
@@ -465,6 +464,17 @@ select:focus-visible {
   padding: 8px 12px calc(8px + var(--safe-bottom));
   border: 0;
   background: rgba(239, 234, 226, .98);
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#composer-wrap textarea,
+#composer-wrap input,
+#composer-wrap button,
+#composer-wrap [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* When the software keyboard is open, keep a constant 8px keyboard-to-composer gap. */
