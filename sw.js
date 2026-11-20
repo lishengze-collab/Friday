@@ -1,4 +1,4 @@
-const CACHE = 'sidechat-shell-v2';
+const CACHE = 'friday-shell-v3';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './app.bundle.gz.b64', './enhancements.js', './manifest.webmanifest', './icon.svg', './icon.svg?v=2', './icon.png', './icon.png?v=2', './icon-192.png', './icon-192.png?v=2', './icon-512.png', './icon-512.png?v=2', './worker.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
