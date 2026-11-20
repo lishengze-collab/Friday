@@ -198,6 +198,23 @@
       overflow: hidden;
     }
   </style>
+
+  <style id="friday-composer-gesture-lock">
+    /* Lock only the composer chrome; preserve text editing inside the textarea. */
+    #composer-wrap {
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: contain;
+    }
+    #composer-wrap textarea,
+    #composer-wrap input,
+    #composer-wrap [contenteditable="true"] {
+      -webkit-user-select: text;
+      user-select: text;
+      overscroll-behavior: contain;
+    }
+  </style>
+
 </head>
 <body>
   <div id="app">
@@ -809,5 +826,36 @@
 
   })();
   </script>
+
+  <script id="friday-composer-gesture-lock-script">
+  (() => {
+    'use strict';
+
+    const wrap = document.getElementById('composer-wrap');
+    if (!wrap || wrap.dataset.verticalGestureLock === 'true') return;
+    wrap.dataset.verticalGestureLock = 'true';
+
+    let blockVerticalPan = false;
+
+    // Allow normal interactions on the actual controls. Only the surrounding
+    // composer surface is prevented from initiating a page-level vertical pan.
+    wrap.addEventListener('touchstart', event => {
+      blockVerticalPan = !event.target.closest(
+        'textarea, input, button, select, a, [contenteditable="true"]'
+      );
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', event => {
+      if (blockVerticalPan) event.preventDefault();
+    }, { passive: false });
+
+    const clearGesture = () => {
+      blockVerticalPan = false;
+    };
+    wrap.addEventListener('touchend', clearGesture, { passive: true });
+    wrap.addEventListener('touchcancel', clearGesture, { passive: true });
+  })();
+  </script>
+
 </body>
 </html>
