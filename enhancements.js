@@ -200,13 +200,17 @@
         if (isMemoryUpdate) return nativeFetch(input, init);
         const prefs = readPrefs();
         const automatic = prefs.autoMode !== false;
-        const decision = automatic
-          ? decideRequestMode(body.messages)
-          : { search: prefs.webSearch, deepThinking: prefs.deepThinking, urlProvided: containsUrl(extractLatestUserText(body.messages)) };
+        const forcePlain = body.__friday_force_plain === true;
+        delete body.__friday_force_plain;
+        const decision = forcePlain
+          ? { search: false, deepThinking: false, urlProvided: false }
+          : automatic
+            ? decideRequestMode(body.messages)
+            : { search: prefs.webSearch, deepThinking: prefs.deepThinking, urlProvided: containsUrl(extractLatestUserText(body.messages)) };
 
         // For ordinary turns the original Response can go straight to the app.
         // Only parse a clone when web citations or reasoning metadata are needed.
-        inspectResponse = !!(decision.search || decision.deepThinking || decision.urlProvided);
+        inspectResponse = !forcePlain && !!(decision.search || decision.deepThinking || decision.urlProvided);
 
         if (decision.search) addPreviousToolContext(body);
 
