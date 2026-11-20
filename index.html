@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#008069">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120i');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120j');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
