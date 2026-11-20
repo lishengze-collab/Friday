@@ -465,7 +465,7 @@ select:focus-visible {
 .composer-wrap {
   position: relative;
   z-index: 4;
-  touch-action: none;
+  touch-action: pan-y;
   flex: 0 0 auto;
   min-width: 0;
   padding: 8px 12px calc(8px + var(--safe-bottom));
@@ -565,6 +565,8 @@ html.friday-keyboard-open .composer-wrap {
   font-size: 15px;
   line-height: 1.42;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-appearance: none;
 }
 
