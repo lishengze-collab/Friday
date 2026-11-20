@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120d');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120e');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -603,14 +603,15 @@
   (() => {
     'use strict';
 
-    if (window.__fridayViewportShellV4) return;
-    window.__fridayViewportShellV4 = true;
+    if (window.__fridayViewportShellV5) return;
+    window.__fridayViewportShellV5 = true;
 
     const root = document.documentElement;
     const viewport = window.visualViewport;
     let frame = 0;
-    let lastTop = -1;
-    let lastHeight = -1;
+    let fullHeight = window.innerHeight || root.clientHeight || 1;
+    let lastAppHeight = -1;
+    let lastKeyboardState = null;
 
     function syncViewport() {
       if (frame) return;
@@ -618,28 +619,36 @@
       frame = requestAnimationFrame(() => {
         frame = 0;
 
-        // The visual viewport becomes shorter when the iOS keyboard opens.
-        // offsetTop also follows Safari's automatic viewport pan around focused inputs.
-        let top = 0;
-        let height = window.innerHeight || root.clientHeight || 1;
+        const layoutHeight = window.innerHeight || root.clientHeight || fullHeight;
+        let visibleTop = 0;
+        let visibleHeight = layoutHeight;
 
         if (viewport && viewport.scale >= 0.98 && viewport.scale <= 1.02) {
-          top = viewport.offsetTop || 0;
-          height = viewport.height || height;
+          visibleTop = Math.max(0, viewport.offsetTop || 0);
+          visibleHeight = viewport.height || layoutHeight;
         }
 
-        top = Math.max(0, Math.round(top));
-        height = Math.max(1, Math.round(height));
+        // The bottom edge of the visual viewport, expressed in layout coordinates.
+        // Keep #app top at 0: Safari may pan the visual viewport, but the app shell
+        // must not become a separately moving drawer.
+        const visibleBottom = Math.max(1, visibleTop + visibleHeight);
+        const appHeight = Math.max(1, Math.min(fullHeight, visibleBottom));
+        const keyboardOpen = (fullHeight - appHeight) > Math.max(120, fullHeight * 0.14);
 
-        // Only write changed values: this avoids unnecessary flex/layout recalculations.
-        if (top !== lastTop) {
-          root.style.setProperty('--friday-vv-top', top + 'px');
-          lastTop = top;
+        const roundedHeight = Math.round(appHeight);
+        if (roundedHeight !== lastAppHeight) {
+          root.style.setProperty('--friday-app-height', roundedHeight + 'px');
+          lastAppHeight = roundedHeight;
         }
 
-        if (height !== lastHeight) {
-          root.style.setProperty('--friday-vv-height', height + 'px');
-          lastHeight = height;
+        if (keyboardOpen !== lastKeyboardState) {
+          root.classList.toggle('friday-keyboard-open', keyboardOpen);
+          lastKeyboardState = keyboardOpen;
+        }
+
+        // Refresh the baseline only after the viewport has returned to its full height.
+        if (!keyboardOpen && layoutHeight > 0) {
+          fullHeight = layoutHeight;
         }
       });
     }
@@ -650,7 +659,12 @@
     }
 
     window.addEventListener('resize', syncViewport, { passive: true });
-    window.addEventListener('orientationchange', syncViewport, { passive: true });
+    window.addEventListener('orientationchange', () => {
+      requestAnimationFrame(() => {
+        fullHeight = window.innerHeight || root.clientHeight || fullHeight;
+        syncViewport();
+      });
+    }, { passive: true });
     window.addEventListener('pageshow', syncViewport);
     document.addEventListener('focusin', syncViewport, true);
     document.addEventListener('focusout', syncViewport, true);
