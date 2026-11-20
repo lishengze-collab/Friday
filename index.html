@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f7f7f2">
+  <meta name="theme-color" content="#008069">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Friday">
@@ -76,6 +76,97 @@
       .long-editor-sheet,.history-picker-sheet { padding-left:12px;padding-right:12px; }
       .long-editor-tools { gap:4px; }
       .long-editor-tools button { min-width:30px;padding:0 7px; }
+    }
+  </style>
+
+  <style id="friday-wa-theme">
+    /* ===== Friday · WhatsApp 风格美化（仅视觉与交互，不改业务逻辑） ===== */
+    :root {
+      --wa-green:#008069; --wa-green-dark:#006b58; --wa-accent:#25d366;
+      --wa-out:#d9fdd3; --wa-in:#ffffff; --wa-bg:#efeae2; --wa-text:#111b21; --wa-sub:#667781;
+    }
+    html,body { background:var(--wa-bg); }
+    #app { background:var(--wa-bg); }
+
+    /* 顶栏：WhatsApp 绿 */
+    #app .topbar { background:var(--wa-green) !important; color:#fff; border-bottom:0 !important; box-shadow:0 1px 3px rgba(0,0,0,.18); padding-top:calc(8px + env(safe-area-inset-top)); }
+    #app .topbar #active-chat-title { color:#fff !important; letter-spacing:.2px; }
+    #app #chat-subtitle { color:rgba(255,255,255,.74) !important; }
+
+    /* 聊天区：米色壁纸 + 淡淡点阵 */
+    #app .chat-scroll { background-color:var(--wa-bg);
+      background-image:radial-gradient(rgba(11,20,26,.045) 1px,transparent 1.2px);
+      background-size:18px 18px; scroll-behavior:smooth; }
+    #app .date-divider { text-align:center; }
+    #app .date-divider span { display:inline-block; padding:5px 12px; border-radius:8px; background:#fff; color:var(--wa-sub); font-size:11.5px; box-shadow:0 1px 1px rgba(11,20,26,.12); }
+
+    /* 气泡：绿色发出、白色收到，带小尾巴 */
+    #app #messages [class*="bubble"] { position:relative; color:var(--wa-text); box-shadow:0 1px 1px rgba(11,20,26,.14) !important; border:0 !important; border-radius:8px !important; background:var(--wa-in); animation:wa-pop .22s ease-out both; }
+    #app #messages [class*="user"] [class*="bubble"],
+    #app #messages [class*="bubble"][class*="user"] { background:var(--wa-out) !important; border-top-right-radius:2px !important; color:var(--wa-text) !important; }
+    #app #messages [class*="assistant"] [class*="bubble"],
+    #app #messages [class*="bubble"][class*="assistant"] { background:var(--wa-in) !important; border-top-left-radius:2px !important; }
+    @keyframes wa-pop { from { opacity:0; transform:translateY(6px) scale(.985); } to { opacity:1; transform:none; } }
+    #app #messages a { color:#027eb5; }
+    #app #messages pre { border-radius:8px; }
+
+    /* 输入栏：圆角白色胶囊 + 绿色发送键 */
+    #app .composer-wrap { background:transparent !important; border-top:0 !important; box-shadow:none !important; }
+    #app .composer { background:#fff !important; border:0 !important; border-radius:26px !important; box-shadow:0 1px 3px rgba(11,20,26,.16) !important; }
+    #app .composer textarea { color:var(--wa-text); }
+    #app .composer-action,#app .composer-expand { background:transparent !important; color:var(--wa-sub) !important; }
+    #app .composer-action:active,#app .composer-expand:active { background:#f0f2f5 !important; }
+    #app .send-button { background:var(--wa-green) !important; color:#fff !important; border:0 !important; box-shadow:0 2px 6px rgba(0,128,105,.35) !important; transition:transform .12s ease, background .15s; }
+    #app .send-button svg { fill:#fff; stroke:#fff; }
+    #app .send-button:active { transform:scale(.92); background:var(--wa-green-dark) !important; }
+    #app .typing-bubble { background:#fff !important; box-shadow:0 1px 1px rgba(11,20,26,.14); }
+
+    /* 通用交互细节 */
+    #app button:not(.chat-list-item):not(.float-orb) { transition:transform .12s ease, background .15s ease, opacity .15s ease; }
+    #app button:not(.chat-list-item):not(.float-orb):active { transform:scale(.95); }
+    #app .primary-button,#app .panel-primary { background:var(--wa-green) !important; color:#fff !important; border:0; }
+    #app .float-panel { background:#fff !important; border:0 !important; border-radius:16px !important; box-shadow:0 8px 28px rgba(11,20,26,.22) !important; animation:wa-pop .18s ease-out both; }
+    #app .menu-item:active,#app .chat-list-item:active { background:#f0f2f5 !important; }
+    #app .chat-list-item.active:not(.swiping-left):not(.swiping-right):not(.swipe-handled) { background:#e7f8ee; }
+    #app .settings-sheet { border-radius:20px 20px 0 0; }
+    #app .toast { background:rgba(17,27,33,.92) !important; color:#fff; border-radius:20px; }
+    ::selection { background:rgba(37,211,102,.28); }
+
+    /* ===== 悬浮窗：收起到屏幕左/右边缘，点击/滑动屏幕边缘唤出 ===== */
+    #app .float-panel[hidden],#app [hidden] { display:none !important; }
+    /* 不改动悬浮球原有位置/拖动逻辑，只用独立的 translate 属性把它们推到最近的屏幕边缘 */
+    #app .float-orb { background:var(--wa-green) !important; color:#fff !important; border:0 !important;
+      box-shadow:0 3px 10px rgba(0,0,0,.26) !important;
+      transition:translate .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
+    #app .float-orb svg { stroke:#fff; }
+    #app .float-orb .orb-label { color:#fff; }
+    body:not(.orbs-open) #app .float-orb { translate:var(--hide-x,140px) 0; opacity:0; pointer-events:none; }
+    body.orbs-open #app .float-orb { translate:0 0; opacity:1; pointer-events:auto; }
+    #app .float-orb.measuring { translate:0 0 !important; transition:none !important; }
+
+    .edge-zone { position:fixed; top:84px; bottom:calc(84px + env(safe-area-inset-bottom)); width:16px; z-index:8; background:transparent; touch-action:pan-y; }
+    .edge-zone.left { left:0; } .edge-zone.right { right:0; }
+    .edge-zone::after { content:""; position:absolute; top:50%; width:4px; height:44px; margin-top:-22px; border-radius:4px; background:rgba(0,128,105,.38); transition:opacity .2s; }
+    .edge-zone.left::after { left:2px; } .edge-zone.right::after { right:2px; }
+    body.orbs-open .edge-zone { pointer-events:none; }
+    body.orbs-open .edge-zone::after { opacity:0; }
+
+    /* ===== 联网搜索链接折叠 ===== */
+    details.src-fold { margin:10px 0 4px; border:1px solid #e1e8e3; border-radius:10px; background:#f7f9f6; overflow:hidden; }
+    details.src-fold > summary { list-style:none; cursor:pointer; padding:8px 12px; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--wa-green); font-weight:600; user-select:none; -webkit-user-select:none; }
+    details.src-fold > summary::-webkit-details-marker { display:none; }
+    details.src-fold > summary::after { content:"›"; margin-left:auto; font-size:16px; line-height:1; color:var(--wa-sub); transition:transform .2s; }
+    details.src-fold[open] > summary::after { transform:rotate(90deg); }
+    details.src-fold > .src-fold-body { padding:2px 12px 10px; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+    details.src-fold > .src-fold-body ul,details.src-fold > .src-fold-body ol { margin:4px 0; padding-left:18px; }
+    details.src-fold > .src-fold-body p { margin:3px 0; }
+
+    /* 导出 PDF（window.print）时：去掉装饰，保持原有打印样式 */
+    @media print {
+      .edge-zone { display:none !important; }
+      #app .chat-scroll { background:#fff !important; }
+      #app #messages [class*="bubble"] { background:#fff !important; border:1px solid #ddd !important; box-shadow:none !important; animation:none !important; }
+      details.src-fold > .src-fold-body { display:block; }
     }
   </style>
 </head>
@@ -466,6 +557,147 @@
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installControls,{once:true});
     else installControls();
     window.addEventListener('pageshow',()=>setTimeout(installControls,200));
+  })();
+  </script>
+
+  <script>
+  /* Friday · 悬浮窗边缘收纳 + 搜索链接折叠（独立模块，不依赖 app.js 内部实现） */
+  (() => {
+    'use strict';
+    const body = document.body;
+
+    /* ---------- 1. 悬浮球收纳到屏幕左/右边缘 ---------- */
+    ['left', 'right'].forEach(side => {
+      const zone = document.createElement('div');
+      zone.className = 'edge-zone ' + side;
+      zone.setAttribute('aria-hidden', 'true');
+      zone.addEventListener('click', () => openOrbs(side));
+      document.body.appendChild(zone);
+    });
+
+    let lastTouch = Date.now();
+    const panelOpen = () => !!document.querySelector('.float-panel:not([hidden])');
+    const orbs = () => Array.from(document.querySelectorAll('.float-orb'));
+    function measureOrbs() {
+      const els = orbs();
+      els.forEach(o => o.classList.add('measuring'));
+      const w = window.innerWidth;
+      const rects = els.map(o => o.getBoundingClientRect());
+      els.forEach((o, i) => {
+        const r = rects[i];
+        const toRight = (r.left + r.right) / 2 >= w / 2;
+        o.style.setProperty('--hide-x', (toRight ? w - r.left + 8 : -(r.right + 8)) + 'px');
+      });
+      els.forEach(o => o.classList.remove('measuring'));
+    }
+    function openOrbs() { body.classList.add('orbs-open'); lastTouch = Date.now(); }
+    function closeOrbs() { measureOrbs(); body.classList.remove('orbs-open'); }
+    window.addEventListener('resize', () => { if (!body.classList.contains('orbs-open')) measureOrbs(); });
+    window.addEventListener('load', measureOrbs);
+    measureOrbs();
+
+    // 点击悬浮球/面板之外的区域 → 收起
+    document.addEventListener('pointerdown', e => {
+      if (!body.classList.contains('orbs-open')) return;
+      if (e.target.closest('.float-orb, .float-panel, .modal-backdrop, .long-editor-backdrop, .history-picker-backdrop')) { lastTouch = Date.now(); return; }
+      if (!panelOpen()) closeOrbs();
+    }, true);
+
+    // 无操作 3.5 秒且没有面板打开 → 自动收起
+    setInterval(() => {
+      if (body.classList.contains('orbs-open') && !panelOpen() && Date.now() - lastTouch > 3500) closeOrbs();
+    }, 600);
+
+    // 从屏幕边缘向内滑动 → 唤出
+    let swipe = null;
+    window.addEventListener('touchstart', e => {
+      const t = e.touches[0]; if (!t) return;
+      const w = window.innerWidth;
+      if (t.clientX <= 22) swipe = { side: 'left', x: t.clientX };
+      else if (t.clientX >= w - 22) swipe = { side: 'right', x: t.clientX };
+      else swipe = null;
+    }, { passive: true });
+    window.addEventListener('touchmove', e => {
+      if (!swipe) return;
+      const t = e.touches[0]; if (!t) return;
+      const dx = swipe.side === 'left' ? t.clientX - swipe.x : swipe.x - t.clientX;
+      if (dx > 26) { openOrbs(swipe.side); swipe = null; }
+    }, { passive: true });
+    window.addEventListener('touchend', () => { swipe = null; }, { passive: true });
+
+    /* ---------- 2. 联网搜索结果链接折叠 ---------- */
+    const LABEL_RE = /(来源|参考|搜索结果|相关链接|链接|引用|资料|出处|sources?|references?|citations?|links?)/i;
+    const isLink = a => /^https?:/i.test(a.getAttribute('href') || '');
+
+    function buildFold(count, label) {
+      const d = document.createElement('details');
+      d.className = 'src-fold';
+      const s = document.createElement('summary');
+      s.textContent = '🔗 ' + (label || '搜索来源') + ' · ' + count + ' 条链接';
+      const inner = document.createElement('div');
+      inner.className = 'src-fold-body';
+      d.append(s, inner);
+      return { d, inner };
+    }
+    function takeLabel(el) {
+      const prev = el.previousElementSibling;
+      if (!prev || prev.closest('details.src-fold')) return null;
+      const t = (prev.textContent || '').trim();
+      if (t.length > 0 && t.length <= 30 && LABEL_RE.test(t) && !prev.querySelector('a')) return prev;
+      return null;
+    }
+    function foldList(list) {
+      if (list.closest('details.src-fold')) return;
+      const items = Array.from(list.children).filter(x => x.tagName === 'LI');
+      if (items.length < 2) return;
+      const ok = items.every(li => {
+        const a = li.querySelector('a');
+        return a && isLink(a) && (li.textContent || '').length <= 260;
+      });
+      if (!ok) return;
+      const labelEl = takeLabel(list);
+      const { d, inner } = buildFold(items.length, labelEl ? labelEl.textContent.trim().replace(/[:：]$/, '') : '');
+      list.replaceWith(d);
+      inner.appendChild(list);
+      if (labelEl) labelEl.remove();
+    }
+    function foldParagraph(p) {
+      if (p.closest('details.src-fold')) return;
+      const links = Array.from(p.querySelectorAll('a')).filter(isLink);
+      if (links.length < 2) return;
+      let rest = p.textContent || '';
+      links.forEach(a => { rest = rest.replace(a.textContent || '', ''); });
+      if (rest.replace(/[\s\d\[\]()（）、,，.。:：·•\-—|]/g, '').length > 40) return;
+      const labelEl = takeLabel(p);
+      const { d, inner } = buildFold(links.length, labelEl ? labelEl.textContent.trim().replace(/[:：]$/, '') : '');
+      p.replaceWith(d);
+      inner.appendChild(p);
+      if (labelEl) labelEl.remove();
+    }
+    function processMessages() {
+      const root = document.getElementById('messages');
+      if (!root) return;
+      root.querySelectorAll('a[href]').forEach(a => {
+        if (isLink(a)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+      });
+      root.querySelectorAll('ul, ol').forEach(foldList);
+      root.querySelectorAll('p').forEach(foldParagraph);
+    }
+    let raf = 0;
+    function schedule() {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; try { processMessages(); } catch (e) { console.warn('Friday fold:', e); } });
+    }
+    // 导出 PDF / 打印时展开所有折叠的来源，避免链接丢失
+    window.addEventListener('beforeprint', () => document.querySelectorAll('details.src-fold').forEach(d => { d.open = true; }));
+    function startObserver() {
+      const root = document.getElementById('messages');
+      if (!root) return;
+      new MutationObserver(schedule).observe(root, { childList: true, subtree: true });
+      schedule();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+    else startObserver();
   })();
   </script>
 </body>
