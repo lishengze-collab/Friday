@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
   <meta name="theme-color" content="#008069">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -167,6 +167,25 @@
       #app .chat-scroll { background:#fff !important; }
       #app #messages [class*="bubble"] { background:#fff !important; border:1px solid #ddd !important; box-shadow:none !important; animation:none !important; }
       details.src-fold > .src-fold-body { display:block; }
+    }
+  </style>
+
+  <style id="friday-native-keyboard-fix">
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      overscroll-behavior: none !important;
+    }
+
+    body {
+      position: fixed !important;
+      inset: 0 !important;
+    }
+
+    #app {
+      top: 0 !important;
+      height: var(--friday-viewport-height, 100dvh) !important;
     }
   </style>
 </head>
@@ -698,6 +717,156 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startObserver, { once: true });
     else startObserver();
+  })();
+  </script>
+
+  <script id="friday-native-keyboard-fix-script">
+  (() => {
+    'use strict';
+
+    if (window.__fridayNativeKeyboardFix) return;
+    window.__fridayNativeKeyboardFix = true;
+
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+
+    let fullHeight = Math.max(
+      window.innerHeight || 0,
+      vv?.height || 0
+    );
+
+    let rafId = 0;
+    let settleTimers = [];
+
+    const viewportHeight = () =>
+      Math.round(vv?.height || window.innerHeight || fullHeight);
+
+    const keyboardThreshold = () =>
+      Math.max(120, fullHeight * 0.16);
+
+    function resetDocumentScroll() {
+      if (window.scrollX || window.scrollY) {
+        window.scrollTo(0, 0);
+      }
+
+      if (root.scrollTop) root.scrollTop = 0;
+      if (document.body?.scrollTop) {
+        document.body.scrollTop = 0;
+      }
+    }
+
+    function syncAppViewport() {
+      rafId = 0;
+
+      const height = viewportHeight();
+      const keyboardVisible =
+        height < fullHeight - keyboardThreshold();
+
+      if (keyboardVisible) {
+        // 键盘打开：只缩小应用内部可视高度
+        root.style.setProperty(
+          '--friday-viewport-height',
+          height + 'px'
+        );
+      } else {
+        // 键盘关闭：恢复完整页面高度
+        root.style.setProperty(
+          '--friday-viewport-height',
+          '100dvh'
+        );
+
+        fullHeight = Math.max(
+          fullHeight,
+          height,
+          window.innerHeight || 0
+        );
+
+        resetDocumentScroll();
+      }
+    }
+
+    function scheduleSync() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(syncAppViewport);
+    }
+
+    function settleAfterFocusChange() {
+      scheduleSync();
+
+      // 兼容 iOS 键盘收起动画
+      settleTimers.forEach(clearTimeout);
+
+      settleTimers = [80, 180, 320, 520, 760, 1050].map(
+        delay => setTimeout(scheduleSync, delay)
+      );
+    }
+
+    document.addEventListener('focusin', scheduleSync, true);
+
+    document.addEventListener(
+      'focusout',
+      settleAfterFocusChange,
+      true
+    );
+
+    window.addEventListener(
+      'resize',
+      scheduleSync,
+      { passive: true }
+    );
+
+    window.addEventListener(
+      'orientationchange',
+      () => {
+        setTimeout(() => {
+          fullHeight = Math.max(
+            window.innerHeight || 0,
+            vv?.height || 0
+          );
+          scheduleSync();
+        }, 350);
+      },
+      { passive: true }
+    );
+
+    if (vv) {
+      vv.addEventListener('resize', scheduleSync, {
+        passive: true
+      });
+
+      vv.addEventListener('scroll', scheduleSync, {
+        passive: true
+      });
+    }
+
+    window.addEventListener(
+      'scroll',
+      resetDocumentScroll,
+      { passive: true }
+    );
+
+    window.addEventListener('pageshow', () => {
+      fullHeight = Math.max(
+        fullHeight,
+        window.innerHeight || 0,
+        vv?.height || 0
+      );
+
+      root.style.setProperty(
+        '--friday-viewport-height',
+        '100dvh'
+      );
+
+      resetDocumentScroll();
+      scheduleSync();
+    });
+
+    root.style.setProperty(
+      '--friday-viewport-height',
+      '100dvh'
+    );
+
+    scheduleSync();
   })();
   </script>
 </body>
