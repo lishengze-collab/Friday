@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120h');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120i');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -602,7 +602,6 @@
   <script id="friday-viewport-shell">
   (() => {
     'use strict';
-
     if (window.__fridayNativeChatShell) return;
     window.__fridayNativeChatShell = true;
 
@@ -613,24 +612,33 @@
 
     let frame = 0;
     let baselineHeight = viewport?.height || window.innerHeight || 1;
-    let keyboardHeight = 0;
     let savedKeyboardHeight = 0;
     let keyboardVisible = false;
     let lastTop = -1;
     let lastHeight = -1;
+    let lastTouchY = null;
+    let touchScroller = null;
     let preLiftTimer = 0;
 
-    const isTextEntry = element =>
-      element instanceof Element &&
-      !!element.closest('textarea, input:not([type="file"]), select, [contenteditable="true"]');
+    const scrollSelector = [
+      '#chat-scroll',
+      '.float-panel',
+      '.settings-sheet',
+      '.long-editor-sheet',
+      '.history-picker-sheet',
+      '.history-list',
+      '.token-chat-usage',
+      '#long-editor-text',
+      '.bubble pre'
+    ].join(',');
 
-    function visualPanTop() {
+    function pagePanTop() {
       if (!viewport) return 0;
       const pageTop = Number(viewport.pageTop);
       const offsetTop = Number(viewport.offsetTop);
       const documentScroll = window.scrollY || document.documentElement.scrollTop || 0;
-      const fromPageTop = Number.isFinite(pageTop) ? Math.max(0, pageTop - documentScroll) : 0;
-      return Math.max(0, fromPageTop, Number.isFinite(offsetTop) ? offsetTop : 0);
+      const pagePan = Number.isFinite(pageTop) ? pageTop - documentScroll : 0;
+      return Math.max(0, pagePan, Number.isFinite(offsetTop) ? offsetTop : 0);
     }
 
     function applyShell(top, height, open) {
@@ -655,28 +663,21 @@
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-
         const visibleHeight = viewport?.height || window.innerHeight || baselineHeight;
-        const layoutHeight = window.innerHeight || baselineHeight;
-        const focused = isTextEntry(document.activeElement);
-        const measuredKeyboard = Math.max(0, baselineHeight - visibleHeight);
-        const open = focused && measuredKeyboard > Math.max(100, baselineHeight * 0.12);
+        const keyboardDelta = Math.max(0, baselineHeight - visibleHeight);
+        const threshold = Math.max(100, baselineHeight * 0.12);
+        const open = keyboardDelta > threshold;
 
         if (open) {
-          keyboardHeight = measuredKeyboard;
-          savedKeyboardHeight = measuredKeyboard;
-          root.style.setProperty('--friday-keyboard-height', Math.round(measuredKeyboard) + 'px');
+          savedKeyboardHeight = keyboardDelta;
+          root.style.setProperty('--friday-keyboard-height', Math.round(keyboardDelta) + 'px');
           root.classList.remove('friday-keyboard-prelift');
-          applyShell(visualPanTop(), visibleHeight, true);
-        } else if (!focused || measuredKeyboard < 60) {
-          keyboardHeight = 0;
+          applyShell(pagePanTop(), visibleHeight, true);
+        } else {
           root.style.setProperty('--friday-keyboard-height', '0px');
           root.classList.remove('friday-keyboard-prelift');
-          applyShell(0, layoutHeight, false);
-          if (!focused) baselineHeight = viewport?.height || layoutHeight;
-        } else {
-          // Keyboard is animating: follow its live visual viewport, not the document.
-          applyShell(visualPanTop(), visibleHeight, true);
+          applyShell(0, visibleHeight, false);
+          baselineHeight = visibleHeight;
         }
       });
     }
@@ -691,9 +692,9 @@
       }, 900);
     }
 
-    // On iOS the browser's focus visibility check can scroll the visual viewport
-    // before the keyboard appears. Take focus on mousedown with preventScroll,
-    // after pre-lifting to the last measured keyboard position when available.
+    // Intercept the first focus on the composer before Safari performs its
+    // visibility check. This is the important step that post-focus resize
+    // listeners cannot provide.
     if (composer && input && window.matchMedia?.('(pointer: coarse)').matches) {
       input.addEventListener('mousedown', event => {
         if (document.activeElement === input) return;
@@ -706,15 +707,48 @@
         } catch (_) {
           input.focus();
         }
-        syncViewport();
       }, true);
-
-      composer.querySelectorAll('button').forEach(button => {
-        button.addEventListener('mousedown', () => {
-          if (keyboardVisible && savedKeyboardHeight) preLiftBeforeFocus();
-        }, true);
-      });
     }
+
+    // Only the message list and explicitly scrollable sheets may consume a
+    // vertical swipe. The page, header, and composer chrome never do.
+    document.addEventListener('touchstart', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      touchScroller = target ? target.closest(scrollSelector) : null;
+      lastTouchY = event.touches[0]?.clientY ?? null;
+    }, { passive: true, capture: true });
+
+    document.addEventListener('touchmove', event => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      const y = touch.clientY;
+      const deltaY = lastTouchY == null ? 0 : y - lastTouchY;
+      lastTouchY = y;
+
+      if (!touchScroller) {
+        event.preventDefault();
+        return;
+      }
+
+      const maxScroll = touchScroller.scrollHeight - touchScroller.clientHeight;
+      if (maxScroll <= 1) {
+        event.preventDefault();
+        return;
+      }
+
+      const atTop = touchScroller.scrollTop <= 1;
+      const atBottom = touchScroller.scrollTop >= maxScroll - 1;
+      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+        event.preventDefault();
+      }
+    }, { passive: false, capture: true });
+
+    const releaseTouch = () => {
+      lastTouchY = null;
+      touchScroller = null;
+    };
+    document.addEventListener('touchend', releaseTouch, { passive: true, capture: true });
+    document.addEventListener('touchcancel', releaseTouch, { passive: true, capture: true });
 
     if (viewport) {
       viewport.addEventListener('resize', syncViewport, { passive: true });
@@ -723,7 +757,6 @@
     window.addEventListener('resize', syncViewport, { passive: true });
     window.addEventListener('orientationchange', () => {
       savedKeyboardHeight = 0;
-      keyboardHeight = 0;
       baselineHeight = window.innerHeight || viewport?.height || baselineHeight;
       root.classList.remove('friday-keyboard-prelift', 'friday-keyboard-open');
       root.style.setProperty('--friday-keyboard-height', '0px');
@@ -734,19 +767,13 @@
       syncViewport();
     });
     document.addEventListener('focusin', syncViewport, true);
-    document.addEventListener('focusout', () => {
-      // Wait for iOS to begin closing the keyboard before restoring the full shell.
-      requestAnimationFrame(syncViewport);
-    }, true);
+    document.addEventListener('focusout', () => requestAnimationFrame(syncViewport), true);
 
-    // Safety net only: keep the root document at y=0 while the keyboard is open.
-    function lockDocumentScroll() {
-      if (!keyboardVisible) return;
-      if ((window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) > 0) {
-        window.scrollTo(0, 0);
-      }
+    // Safety net for OS keyboard switches where no DOM pre-focus event fires.
+    function keepDocumentAtOrigin() {
+      if (keyboardVisible && window.scrollY > 0) window.scrollTo(0, 0);
     }
-    window.addEventListener('scroll', lockDocumentScroll, { passive: true });
+    window.addEventListener('scroll', keepDocumentAtOrigin, { passive: true });
 
     syncViewport();
   })();
