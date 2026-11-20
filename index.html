@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120o');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120p');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -49,6 +49,11 @@
 
     <div class="composer-wrap" id="composer-wrap">
       <div id="attachment-tray" class="attachment-tray" hidden></div>
+      <div id="quote-preview" class="quote-preview" hidden aria-live="polite">
+        <span class="quote-preview-label">引用</span>
+        <span id="quote-preview-text" class="quote-preview-text"></span>
+        <button id="clear-quote-button" type="button" aria-label="清除引用" title="清除引用">×</button>
+      </div>
       <div class="composer">
         <button id="attach-button" class="composer-action" aria-label="上传图片或文档" title="上传图片或文档">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -448,33 +453,64 @@
         return String(copy.innerText || copy.textContent || '').replace(/\u00a0/g, ' ').trim();
       }
 
+      let pendingQuote = null;
+      const quotePreview = byId('quote-preview');
+      const quotePreviewText = byId('quote-preview-text');
+      const clearQuoteButton = byId('clear-quote-button');
+
+      function clearPendingQuote() {
+        pendingQuote = null;
+        if (quotePreview) quotePreview.hidden = true;
+        if (quotePreviewText) quotePreviewText.textContent = '';
+      }
+
+      function consumePendingQuote() {
+        const input = byId('message-input');
+        const send = byId('send-button');
+        if (!pendingQuote || !input || send?.disabled) return;
+        const draft = input.value.trim();
+        const quoteLine = '【引用内容：「' + pendingQuote.excerpt + '」】';
+        input.value = quoteLine + (draft ? ' ' + draft : ' 请基于这条引用继续回答。');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        clearPendingQuote();
+      }
+
+      if (clearQuoteButton) {
+        clearQuoteButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          clearPendingQuote();
+        });
+      }
+
+      // Inject the hidden one-line context before the app's own send handlers run.
+      document.addEventListener('click', event => {
+        if (event.target instanceof Element && event.target.closest('#send-button')) {
+          consumePendingQuote();
+        }
+      }, true);
+
+      document.addEventListener('keydown', event => {
+        if (event.target === byId('message-input') &&
+            event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+          consumePendingQuote();
+        }
+      }, true);
+
       function appendQuoteToComposer(row) {
         const input = byId('message-input');
-        if (!input) return;
+        if (!input || !quotePreview || !quotePreviewText) return;
 
         const text = plainMessageText(row).replace(/\s+/g, ' ').trim();
         if (!text) return;
 
         const role = row.classList.contains('assistant') ? 'Friday' : '我';
-        // Keep only a compact excerpt; the surrounding chat history already
-        // supplies the full conversational context when this follow-up is sent.
-        const excerptChars = Array.from(text);
-        const excerpt = excerptChars.length > 5
-          ? excerptChars.slice(0, 5).join('') + '…'
-          : text;
-        const block = (input.value.trim() ? '\n\n' : '') +
-          '【追问引用 · ' + role + '】\n' +
-          '> ' + excerpt +
-          '\n\n请继续说明：';
-
-        const inputIsFocused = document.activeElement === input;
-        const start = inputIsFocused ? input.selectionStart : input.value.length;
-        const end = inputIsFocused ? input.selectionEnd : input.value.length;
-        input.setRangeText(block, start, end, 'end');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const chars = Array.from(text);
+        const excerpt = chars.length > 5 ? chars.slice(0, 5).join('') + '…' : text;
+        pendingQuote = { excerpt, role };
+        quotePreviewText.textContent = '「' + excerpt + '」';
+        quotePreview.hidden = false;
         try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
-        const caret = input.value.length;
-        input.setSelectionRange(caret, caret);
       }
       function addButtons() {
         root.querySelectorAll('.message-row').forEach(row => {
