@@ -486,6 +486,13 @@ select:focus-visible {
 }
 
 /* No safe-area spacer is needed below the composer while the keyboard is visible. */
+/* Before iOS focuses the textarea, pre-shrink the shell to the last known keyboard height. */
+html.friday-keyboard-prelift #app {
+  top: 0 !important;
+  height: max(1px, calc(var(--friday-vv-height, 100dvh) - var(--friday-keyboard-height, 0px))) !important;
+}
+
+/* Keyboard-visible shell uses the actual visual viewport with no home-indicator spacer. */
 html.friday-keyboard-open .composer-wrap {
   padding-bottom: 0 !important;
 }
