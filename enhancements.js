@@ -100,8 +100,10 @@
     if (isCompletion && init?.body && typeof init.body === 'string') {
       try {
         const body = JSON.parse(init.body);
+        const isMemoryUpdate = body.messages?.some(m => m.role === 'system' && String(m.content || '').includes('维护一个 Sidechat 的长期用户偏好摘要'));
+        if (isMemoryUpdate) return nativeFetch(input, init);
         const prefs = readPrefs();
-        addPreviousToolContext(body);
+        if (prefs.webSearch) addPreviousToolContext(body);
         body.max_tokens = MAX_OUTPUT_TOKENS;
         body.thinking = { type: prefs.deepThinking ? 'enabled' : 'disabled' };
         body.reasoning_effort = prefs.deepThinking ? 'max' : 'none';
@@ -119,7 +121,7 @@
       const message = data?.choices?.[0]?.message;
       if (!message || data.error) return response;
       const content = normalizeMessageContent(message);
-      if (message.server_tool_calls?.length && content) {
+      if ((message.server_tool_calls?.length || typeof message.reasoning_content === 'string') && content) {
         const cache = readMeta();
         cache[hashText(content)] = { server_tool_calls: message.server_tool_calls, reasoning_content: message.reasoning_content || '' };
         writeMeta(cache);
