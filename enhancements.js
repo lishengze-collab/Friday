@@ -212,7 +212,7 @@
         // Only parse a clone when web citations or reasoning metadata are needed.
         inspectResponse = !forcePlain && !!(decision.search || decision.deepThinking || decision.urlProvided);
 
-        if (decision.search) addPreviousToolContext(body);
+        if (decision.search || decision.urlProvided) addPreviousToolContext(body);
 
         // DeepSeek's server-side web tools are model-selected once made available.
         // Thinking + web_search enables multi-step deep-thinking search.
@@ -226,6 +226,7 @@
             { type: 'deepseek_read_url' }
           ];
         } else if (decision.urlProvided) {
+          body.model = 'deepseek-flash';
           body.tools = [{ type: 'deepseek_read_url' }];
         } else {
           delete body.tools;
