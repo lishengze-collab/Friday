@@ -2242,3 +2242,38 @@ body.orbs-open .edge-zone::after { opacity: 0; }
   min-width: 38px;
   margin: 0;
 }
+
+
+/* Friday message quote: a persisted quote card attached to its sent message. */
+.friday-message-quote {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  overflow: hidden;
+  border-left: 2px solid var(--wa-green, #008069);
+  border-radius: 7px;
+  background: rgba(0, 128, 105, .075);
+  text-align: left;
+}
+
+.friday-message-quote-label {
+  margin: 0 0 3px;
+  color: var(--wa-green, #008069);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.friday-message-quote-text {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: #596a63;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
