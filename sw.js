@@ -1,5 +1,5 @@
 
-const CACHE = 'friday-shell-v18-20261124b';
+const CACHE = 'friday-shell-v19-20261124c';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
