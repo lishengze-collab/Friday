@@ -20,7 +20,7 @@
       navigator.serviceWorker.register = (scriptURL, options) => {
         try {
           const url = new URL(scriptURL, location.href);
-          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261120q');
+          if (url.pathname.endsWith('/sw.js')) url.searchParams.set('v', 'friday-ui-20261124a');
           return originalRegister(url.href, options);
         } catch (_) { return originalRegister(scriptURL, options); }
       };
@@ -460,19 +460,18 @@
 
       function clearPendingQuote() {
         pendingQuote = null;
+        window.__fridayPendingQuote = null;
         if (quotePreview) quotePreview.hidden = true;
         if (quotePreviewText) quotePreviewText.textContent = '';
       }
 
+      // The full quote travels as request context; it is never pasted into the visible textarea.
+      window.__fridayClearQuotePreview = clearPendingQuote;
+
       function consumePendingQuote() {
-        const input = byId('message-input');
         const send = byId('send-button');
-        if (!pendingQuote || !input || send?.disabled) return;
-        const draft = input.value.trim();
-        const quoteLine = '【引用内容：「' + pendingQuote.excerpt + '」】';
-        input.value = quoteLine + (draft ? ' ' + draft : ' 请基于这条引用继续回答。');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        clearPendingQuote();
+        if (!pendingQuote || send?.disabled) return;
+        window.__fridayPendingQuote = { text: pendingQuote.text, role: pendingQuote.role };
       }
 
       if (clearQuoteButton) {
@@ -483,7 +482,6 @@
         });
       }
 
-      // Inject the hidden one-line context before the app's own send handlers run.
       document.addEventListener('click', event => {
         if (event.target instanceof Element && event.target.closest('#send-button')) {
           consumePendingQuote();
@@ -501,14 +499,12 @@
         const input = byId('message-input');
         if (!input || !quotePreview || !quotePreviewText) return;
 
-        const text = plainMessageText(row).replace(/\s+/g, ' ').trim();
+        const text = plainMessageText(row).trim();
         if (!text) return;
 
         const role = row.classList.contains('assistant') ? 'Friday' : '我';
-        const chars = Array.from(text);
-        const excerpt = chars.length > 5 ? chars.slice(0, 5).join('') + '…' : text;
-        pendingQuote = { excerpt, role };
-        quotePreviewText.textContent = '「' + excerpt + '」';
+        pendingQuote = { text, role };
+        quotePreviewText.textContent = '「' + text.replace(/\s+/g, ' ') + '」';
         quotePreview.hidden = false;
         try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
       }
