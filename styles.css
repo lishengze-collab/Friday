@@ -513,17 +513,9 @@ html.friday-keyboard-open .composer-wrap {
   padding-bottom: 0 !important;
 }
 
-.composer {
-  width: 100%;
-  max-width: 920px;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-/* One-line quote preview inside the composer; it never expands the textarea. */
+
+/* Fixed one-line quote strip above the composer; quote text never resizes the textarea. */
 .quote-preview {
-  order: -1;
-  flex: 0 0 100%;
   width: 100%;
   min-width: 0;
   height: 23px;
@@ -573,6 +565,12 @@ html.friday-keyboard-open .composer-wrap {
 }
 #clear-quote-button:active { background: rgba(0,0,0,.06); }
 
+.composer {
+  width: 100%;
+  max-width: 920px;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
   gap: 7px;
   margin: 0 auto;
   padding: 6px 7px;
