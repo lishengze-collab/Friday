@@ -2188,7 +2188,7 @@ body.orbs-open .edge-zone::after { opacity: 0; }
 
 
 
-/* Friday composer layout hardening: fixed control columns, flexible input column. */
+/* Friday composer layout hardening: one stable horizontal row on narrow and wide screens. */
 #composer-wrap {
   width: 100%;
   align-self: stretch;
@@ -2196,11 +2196,12 @@ body.orbs-open .edge-zone::after { opacity: 0; }
 }
 
 #composer-wrap .composer {
-  display: grid !important;
-  grid-template-columns: 36px minmax(0, 1fr) 32px 38px;
-  align-items: center;
-  justify-content: stretch;
-  gap: 7px;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px;
   width: min(100%, 920px);
   max-width: 920px;
   min-width: 0;
@@ -2209,32 +2210,35 @@ body.orbs-open .edge-zone::after { opacity: 0; }
 }
 
 #composer-wrap #attach-button {
-  grid-column: 1;
-  justify-self: center;
-  flex: none;
+  order: 1;
+  flex: 0 0 36px !important;
+  width: 36px;
+  min-width: 36px;
   margin: 0;
 }
 
 #composer-wrap #message-input {
-  grid-column: 2;
-  justify-self: stretch;
-  width: 100%;
-  max-width: 100%;
+  order: 2;
+  flex: 1 1 0% !important;
+  width: 0 !important;
+  max-width: none;
   min-width: 0;
-  flex: none;
+  margin: 0;
   box-sizing: border-box;
 }
 
 #composer-wrap #expand-editor-button {
-  grid-column: 3;
-  justify-self: center;
-  flex: none;
+  order: 3;
+  flex: 0 0 32px !important;
+  width: 32px;
+  min-width: 32px;
   margin: 0;
 }
 
 #composer-wrap #send-button {
-  grid-column: 4;
-  justify-self: center;
-  flex: none;
+  order: 4;
+  flex: 0 0 38px !important;
+  width: 38px;
+  min-width: 38px;
   margin: 0;
 }
