@@ -2186,3 +2186,55 @@ body.orbs-open .edge-zone::after { opacity: 0; }
   }
 }
 
+
+
+/* Friday composer layout hardening: fixed control columns, flexible input column. */
+#composer-wrap {
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+#composer-wrap .composer {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 32px 38px;
+  align-items: center;
+  justify-content: stretch;
+  gap: 7px;
+  width: min(100%, 920px);
+  max-width: 920px;
+  min-width: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+#composer-wrap #attach-button {
+  grid-column: 1;
+  justify-self: center;
+  flex: none;
+  margin: 0;
+}
+
+#composer-wrap #message-input {
+  grid-column: 2;
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: none;
+  box-sizing: border-box;
+}
+
+#composer-wrap #expand-editor-button {
+  grid-column: 3;
+  justify-self: center;
+  flex: none;
+  margin: 0;
+}
+
+#composer-wrap #send-button {
+  grid-column: 4;
+  justify-self: center;
+  flex: none;
+  margin: 0;
+}
